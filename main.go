@@ -51,21 +51,14 @@ func Main() {
 
 	switch {
 	case stat.Mode()&os.ModeDir == os.ModeDir:
-		extendFSMode(path)
+		devName := getBlockDevice(path)
+		extendBlockDevice(devName)
 	case stat.Mode()&os.ModeDevice == os.ModeDevice:
-		extendPartition(path)
+		extendBlockDevice(path)
 	default:
-		doErrMess("Parameter must be path to mount point of filesystem or partition.")
+		doErrMess("Parameter must be path to mount point of filesystem or partition or lvm-volume.")
 		return
 	}
-}
-
-func doErrMess(mess string) {
-	panic(errors.New(mess))
-}
-
-func doErr(err error) {
-	panic(err)
 }
 
 /*
@@ -134,96 +127,15 @@ func detectLVMVolume(path string) (group, volume string) {
 	return
 }
 
-func getSizeBlockDev(path string) uint32 {
-	res, err := cmd("blockdev", "--getsz", path)
-	if err != nil {
-		doErr(err)
-		return 0
-	}
-
-	size64, err := strconv.ParseUint(strings.TrimSpace(res), 10, 32)
-	if err != nil {
-		doErr(err)
-	}
-	return uint32(size64)
+func doErrMess(mess string) {
+	panic(errors.New(mess))
 }
 
-/*
-Extend ext 3,4 partitions
-Return:
-  true - if filesystem was extended
-  false - if filesystem has max size already
-call doErr if errors
-*/
-func extendExt(partPath string) bool {
-	// Force check filesystem before extend
-	cmd("e2fsck", "-f", partPath)
-
-	res, err := cmd("resize2fs", partPath)
-	if err != nil {
-		doErrMess("Can't resize2f2 " + partPath + ": " + err.Error())
-	}
-	return !strings.Contains(res, "Nothing to do")
+func doErr(err error) {
+	panic(err)
 }
 
-func extendFileSystem(devName string) {
-	// detect upper level storage:
-	res, err := cmd("blkid", devName)
-	if err != nil && err.Error() != "exit status 2" {
-		doErrMess("Can't detect what stored on " + devName + ": " + err.Error())
-		return
-	}
-
-	res = strings.TrimSpace(res)
-	switch {
-	case res == "": // Empty partition
-		return
-	case strings.Contains(res, `TYPE="LVM2_member"`): // LVM Physical volume
-		if extendLVMPhysicalVolume(devName) {
-			didNothing = false
-		}
-	case strings.Contains(res, `TYPE="xfs"`): // Xfs file system
-		if extendXFS(devName) {
-			didNothing = false
-		}
-	case strings.Contains(res, `TYPE="ext3"`) || strings.Contains(res, `TYPE="ext4"`): // Ext-family with online resize support
-		if extendExt(devName) {
-			didNothing = false
-		}
-	default:
-		doErrMess("Can't detect or unsupported file system of " + devName + " (" + res + ")")
-		return
-	}
-}
-
-func extendFSMode(path string) {
-	// check if it is mountpoint
-	mtab, err := os.Open("/etc/mtab")
-	defer mtab.Close()
-	if err != nil {
-		doErr(err)
-	}
-
-	var devName string = ""
-	reader := bufio.NewScanner(mtab)
-	for reader.Scan() {
-		lineParts := strings.Split(reader.Text(), " ")
-		if len(lineParts) < 2 {
-			continue
-		}
-		if lineParts[1] == path {
-			devName = lineParts[0]
-			break
-		}
-	}
-	if reader.Err() != nil {
-		doErr(reader.Err())
-	}
-	if devName == "" {
-		doErrMess("Parameter must be path to mount point of filesystem or partition (2).")
-		return
-	}
-
+func extendBlockDevice(devName string){
 	lvgroup, lvvolume := detectLVMVolume(devName)
 
 	// if it is NOT LVM
@@ -274,6 +186,85 @@ func extendFSMode(path string) {
 	}
 
 	extendFileSystem(devName)
+}
+
+/*
+Extend ext 3,4 partitions
+Return:
+  true - if filesystem was extended
+  false - if filesystem has max size already
+call doErr if errors
+*/
+func extendExt(partPath string) bool {
+	// Force check filesystem before extend
+	cmd("e2fsck", "-f", partPath)
+
+	res, err := cmd("resize2fs", partPath)
+	if err != nil {
+		doErrMess("Can't resize2f2 " + partPath + ": " + err.Error())
+	}
+	return !strings.Contains(res, "Nothing to do")
+}
+
+func getBlockDevice(path string)string {
+	// check if it is mountpoint
+	mtab, err := os.Open("/etc/mtab")
+	defer mtab.Close()
+	if err != nil {
+		doErr(err)
+	}
+
+	var devName string = ""
+	reader := bufio.NewScanner(mtab)
+	for reader.Scan() {
+		lineParts := strings.Split(reader.Text(), " ")
+		if len(lineParts) < 2 {
+			continue
+		}
+		if lineParts[1] == path {
+			devName = lineParts[0]
+			break
+		}
+	}
+	if reader.Err() != nil {
+		doErr(reader.Err())
+	}
+	if devName == "" {
+		doErrMess("Parameter must be path to mount point of filesystem or partition (2).")
+		return ""
+	}
+
+	return devName
+}
+
+func extendFileSystem(devName string) {
+	// detect upper level storage:
+	res, err := cmd("blkid", devName)
+	if err != nil && err.Error() != "exit status 2" {
+		doErrMess("Can't detect what stored on " + devName + ": " + err.Error())
+		return
+	}
+
+	res = strings.TrimSpace(res)
+	switch {
+	case res == "": // Empty partition
+		return
+	case strings.Contains(res, `TYPE="LVM2_member"`): // LVM Physical volume
+		if extendLVMPhysicalVolume(devName) {
+			didNothing = false
+		}
+	case strings.Contains(res, `TYPE="xfs"`): // Xfs file system
+		if extendXFS(devName) {
+			didNothing = false
+		}
+	case strings.Contains(res, `TYPE="ext3"`) || strings.Contains(res, `TYPE="ext4"`): // Ext-family with online resize support
+		if extendExt(devName) {
+			didNothing = false
+		}
+	default:
+		doErrMess("Can't detect or unsupported file system of " + devName + " (" + res + ")")
+		return
+	}
 }
 
 /*
@@ -446,6 +437,20 @@ func extendXFS(partPath string) bool {
 	return strings.Contains(res, "data blocks changed from") // data blocks changed from 262144 to 524288
 }
 
+func getSizeBlockDev(path string) uint32 {
+	res, err := cmd("blockdev", "--getsz", path)
+	if err != nil {
+		doErr(err)
+		return 0
+	}
+
+	size64, err := strconv.ParseUint(strings.TrimSpace(res), 10, 32)
+	if err != nil {
+		doErr(err)
+	}
+	return uint32(size64)
+}
+
 func printUsage() {
 	fmt.Println(`Usage: fsextender <path_to_part>|<path_to_fs>
 Extend mbr partition and LVM physical volume/filesystem to max size.
@@ -457,14 +462,16 @@ It support only primary MBR partitions now.
 path_to_part - path to device partition, which need to be extended: /dev/sdb1, /dev/hda2 ...
   in the case - extend block device to max size and upper level on device.
   It can be filesystem or physycal volume of LVM.
-path_to_dev - указывается путь к разделу диска, который нужно расширить, например: /dev/sdb1, /dev/hda2
+path_to_part - указывается путь к разделу диска, который нужно расширить, например: /dev/sdb1, /dev/hda2
   в этом случае расширяется указанный раздел и то что на нем лежит (файловая система или физический том LVM).
 
 path_to_fs - path to filesystem, need to be extended: /home, /var/lib, ...
   in the case - extend all underly block devices and fs.
+  It can be path to LVM-volume with filesystem.
 path_to_fs - путь к файловой системе, которую нужно расширить: /home, /var/lib, ...
   в этом случае расширяются все нижележащие слои LVM если они есть, разделы для них (или файловой системы) и затем
-  сама файловая система
+  сама файловая система.
+  Может указываться путь к LVM-тому с файловой системой.
 
 Difference:
   When filesystem is on top of common disk partition both variants identical.

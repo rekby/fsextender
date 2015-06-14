@@ -14,14 +14,16 @@ It support only primary MBR partitions now.
 path_to_part - path to device partition, which need to be extended: /dev/sdb1, /dev/hda2 ...
   in the case - extend block device to max size and upper level on device.
   It can be filesystem or physycal volume of LVM.
-path_to_dev - указывается путь к разделу диска, который нужно расширить, например: /dev/sdb1, /dev/hda2
+path_to_part - указывается путь к разделу диска, который нужно расширить, например: /dev/sdb1, /dev/hda2
   в этом случае расширяется указанный раздел и то что на нем лежит (файловая система или физический том LVM).
 
 path_to_fs - path to filesystem, need to be extended: /home, /var/lib, ...
   in the case - extend all underly block devices and fs.
+  It can be path to LVM-volume with filesystem.
 path_to_fs - путь к файловой системе, которую нужно расширить: /home, /var/lib, ...
   в этом случае расширяются все нижележащие слои LVM если они есть, разделы для них (или файловой системы) и затем
-  сама файловая система
+  сама файловая система.
+  Может указываться путь к LVM-тому с файловой системой.
 
 Difference:
   When filesystem is on top of common disk partition both variants identical.
