@@ -35,6 +35,10 @@ func printUsage() {
 	fmt.Printf(`Usage: %v <start_point> [--do]
 start_point - path to block device or file system to extend
 --do - do extending. Without it - print extend plan only.
+
+The program print to stdout:
+OK - if extended compele.
+NEED REBOOT AND START ME ONCE AGAIN. - if need reboot and run command with same parameters
 `, os.Args[0])
 }
 
