@@ -132,7 +132,7 @@ func blkid(path string) string {
 	return string(typeBytes[:end])
 }
 
-var diskNewPartitionNumLastGeneratedNum map[[2]int]uint32
+var diskNewPartitionNumLastGeneratedNum = make(map[[2]int]uint32)
 
 func diskNewPartitionNum(disk diskInfo) uint32 {
 	mm := [2]int{disk.Major, disk.Minor}
@@ -149,6 +149,7 @@ partNumLoop:
 		if partNum > disk.MaxPartitionCount {
 			return 0
 		}
+		diskNewPartitionNumLastGeneratedNum[mm] = partNum
 		return partNum
 	}
 	return 0
