@@ -1,0 +1,20 @@
+All tests make for /dev/sdb with
+Disk /dev/sdb: 85899345920B  (80 GiB).
+Sector size (logical/physical): 512B/512B
+
+!!! ATTENTION. LOST DATA!!! :
+1. ALL DATA IN /dev/sdb will LOST during test
+2. ALL DATA IN LVM VOLUME GROUP tlvm WILL LOST
+3. ALL DATA IN /mnt/test WILL LOST
+
+Do tests only in empty (virtual) computter without your data.
+
+Run tests:
+1. export FSEXTENDER_TEST=1
+2. export PARTTYPE=gpt or export PARTTYPE=msdos
+3. cd to the directory with tests.
+4. ./test-1.sh
+5. fsextender /mnt/test --do # Reboot and repeat if need
+6. do _check.sh test-1 # may use test-1, test-1., test-1.sh - for userful with bash autocomplete
+7. repeat 4-6 for all tests waht you want.
+
