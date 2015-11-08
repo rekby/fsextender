@@ -29,6 +29,8 @@ func extendPrint(plan []storageItem) {
 		case type_PARTITION_NEW:
 			if item.Partition.Disk.PartTable == "msdos" && item.Partition.Number > 4 {
 				fmt.Println("!!! ATTENTION, Can't create more then 4 partition in msdos table. Skip it. ", item)
+			} else {
+				fmt.Println(item)
 			}
 		default:
 			fmt.Println(item)
