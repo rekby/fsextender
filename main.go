@@ -16,6 +16,11 @@ func main() {
 
 	startPoint := os.Args[1]
 	storage, err := extendScanWays(startPoint)
+	//	fmt.Println("SCAN PLAN:")
+	//	extendPrint(storage)
+	//	fmt.Println()
+	//	fmt.Println()
+	//	fmt.Println()
 	if err != nil {
 		panic(err)
 	}

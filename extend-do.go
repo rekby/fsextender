@@ -7,9 +7,13 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strconv"
+	"time"
 )
 
 const MAX_UINT32 = 4294967295
+const TRY_COUNT = 5 // Retry operations if it can and first is fail. For example - fast change LVM not always succesfully
+// and need retry after few seconds.
 
 func extendPrint(plan []storageItem) {
 	addSize := make([]uint64, len(plan))
@@ -19,15 +23,16 @@ func extendPrint(plan []storageItem) {
 			addSize[item.Child] += item.FreeSpace
 		}
 		if item.Type == type_PARTITION && item.FreeSpace > 0 {
-			fmt.Println(item, "May need reboot")
+			fmt.Println(strconv.Itoa(i)+": ", item, "May need reboot")
 		} else {
-			fmt.Println(item)
+			fmt.Println(strconv.Itoa(i)+": ", item)
 		}
 	}
 }
 
 func extendDo(plan []storageItem) (needReboot bool) {
 	for i := range plan {
+		log.Println("DO ", strconv.Itoa(i)+":", plan[i])
 		item := &plan[i]
 		switch item.Type {
 		case type_PARTITION:
@@ -35,6 +40,10 @@ func extendDo(plan []storageItem) (needReboot bool) {
 			oldFreeSpace := item.FreeSpace
 			switch item.Partition.Disk.PartTable {
 			case "msdos":
+				if item.Partition.Number > 4 {
+					log.Println("WARNING: Can't work with partition number > 4 in msdos partition table.")
+					continue
+				}
 				diskIO, err := os.OpenFile(item.Partition.Disk.Path, os.O_RDONLY|os.O_SYNC, 0)
 				if err != nil {
 					log.Println("Can't open disk: ", item.Partition.Disk.Path, err)
@@ -144,6 +153,10 @@ func extendDo(plan []storageItem) (needReboot bool) {
 		case type_PARTITION_NEW:
 			switch item.Partition.Disk.PartTable {
 			case "msdos":
+				if item.Partition.Number > 4 {
+					log.Println("WARNING: Can't create partition with number > 4 in msdos partition table.")
+					continue
+				}
 				diskIO, err := os.OpenFile(item.Partition.Disk.Path, os.O_RDWR, 0)
 				if err != nil {
 					log.Println("Can't create partition: ", item.Path, err)
@@ -268,83 +281,118 @@ func extendDo(plan []storageItem) (needReboot bool) {
 			}
 			fmt.Printf("Free space on LVM_GROUP '%v' %v\n", item.Path, formatSize(item.FreeSpace))
 		case type_LVM_LV:
-			cmd("lvresize", "-l", "+100%FREE", item.Path)
-			newSize := lvmLVGetSize(item.Path)
-			addSpace := newSize - item.Size
-			fmt.Printf("Resize LVM_LV %v to %v(+%v)\n", item.Path, formatSize(newSize), formatSize(addSpace))
-			item.Size = newSize
-			item.FreeSpace = 0
-			if item.Child != -1 {
-				plan[item.Child].FreeSpace += addSpace
+		retryLoop2:
+			for retry := 0; retry < TRY_COUNT; retry++ {
+				if retry > 0 {
+					log.Println("Try extend LVM LV once more:", item.Path)
+					time.Sleep(time.Second)
+				}
+				cmd("lvresize", "-l", "+100%FREE", item.Path)
+				newSize := lvmLVGetSize(item.Path)
+				addSpace := newSize - item.Size
+				if plan[item.Child].FreeSpace > 0 && (addSpace == 0 || newSize == 0) {
+					continue retryLoop2
+				}
+				fmt.Printf("Resize LVM_LV %v to %v(+%v)\n", item.Path, formatSize(newSize), formatSize(addSpace))
+				item.Size = newSize
+				item.FreeSpace = 0
+				if item.Child != -1 {
+					plan[item.Child].FreeSpace += addSpace
+				}
+				break retryLoop2
 			}
 		case type_LVM_PV:
-			cmd("pvresize", item.Path)
-			newSize := lvmPVGetSize(item.Path)
-			addSpace := newSize - item.Size
-			if item.Child != -1 {
-				plan[item.Child].FreeSpace += addSpace
+		retryLoop:
+			for retry := 9; retry < TRY_COUNT; retry++ {
+				if retry > 0 {
+					log.Println("Try to resize LVM PV once more:", item.Path)
+				}
+				cmd("pvresize", item.Path)
+				newSize := lvmPVGetSize(item.Path)
+				addSpace := newSize - item.Size
+				if plan[item.Child].FreeSpace > 0 && (addSpace == 0 || newSize == 0) {
+					continue retryLoop
+				}
+				if item.Child != -1 {
+					plan[item.Child].FreeSpace += addSpace
+				}
+				fmt.Printf("LVM PV Resized: %v to %v (+%v)\n", item.Path, formatSize(newSize), formatSize(addSpace))
+				item.FreeSpace -= addSpace
+				item.Size = newSize
+				break retryLoop
 			}
-			fmt.Printf("LVM PV Resized: %v to %v (+%v)\n", item.Path, formatSize(newSize), formatSize(addSpace))
-			item.FreeSpace -= addSpace
-			item.Size = newSize
 		case type_LVM_PV_NEW:
 			vg := plan[item.Child].Path
 			oldSize, _, _ := lvmVGGetSize(vg)
-			cmd("pvcreate", item.Path)
-			cmd("vgextend", vg, item.Path)
-			newSize, _, _ := lvmVGGetSize(vg)
-			fmt.Printf("Add PV %v (+%v)\n", item.Path, formatSize(newSize-oldSize))
+		retryLoop3:
+			for retry := 0; retry < TRY_COUNT; retry++ {
+				cmd("pvcreate", item.Path)
+				cmd("vgextend", vg, item.Path)
+				newSize, _, _ := lvmVGGetSize(vg) // Yes - create LVM PV, but check size of LVM VG. It is OK.
+				addSpace := newSize - oldSize
+				if plan[item.Child].FreeSpace > 0 && (addSpace == 0 || newSize == 0) {
+					fmt.Println("Try extend VG once more: ", vg, item.Path)
+					time.Sleep(time.Second)
+					continue retryLoop3
+				} else {
+					fmt.Printf("Add PV %v (+%v)\n", item.Path, formatSize(newSize-oldSize))
+					break retryLoop3
+				}
+			}
 
 		case type_FS:
-			switch item.FSType {
-			case "ext3", "ext4":
-				res, stderr, _ := cmd("resize2fs", "-f", item.Path)
-				newSize, err := fsGetSizeExt(item.Path)
-				if err != nil {
-					log.Printf("ATTENTION: Can't read new size after fs resize. Log of resize:\nstdout:%v\nstderr:%v\n", res, stderr)
-					continue
-				}
-				addSpace := newSize - item.Size
-				item.FreeSpace -= addSpace
-				item.Size = newSize
-				if addSpace == 0 {
-					log.Printf("Filesystem doesn't extend. Log of resize:\nstdout: %v\nstderr: %v\n", res, stderr)
-					continue
-				}
-				fmt.Printf("Resize filesystem: %v to %v (+%v)\n", item.Path, formatSize(item.Size), formatSize(addSpace))
-			case "xfs":
-				var tmpMountPoint string
-				var mountPoint string
-				if mountPoint, _ = getMountPoint(item.Path); mountPoint == "" {
-					tmpMountPoint, err := ioutil.TempDir("", "")
-					if _, _, err = cmd("mount", "-t", "xfs", item.Path, tmpMountPoint); err != nil {
-						log.Printf("Can't xfs mount: %v", err)
+		retryLoop4:
+			for retry := 0; retry < TRY_COUNT; retry++ {
+				switch item.FSType {
+				case "ext3", "ext4":
+					res, stderr, _ := cmd("resize2fs", "-f", item.Path)
+					newSize, err := fsGetSizeExt(item.Path)
+					if err != nil {
+						log.Printf("ATTENTION: Can't read new size after fs resize. Log of resize:\nstdout:%v\nstderr:%v\n", res, stderr)
+						continue retryLoop4
 					}
-					mountPoint = tmpMountPoint
-				}
+					addSpace := newSize - item.Size
+					item.FreeSpace -= addSpace
+					item.Size = newSize
+					if addSpace == 0 {
+						log.Printf("Filesystem doesn't extend. Log of resize:\nstdout: %v\nstderr: %v\n", res, stderr)
+						continue retryLoop4
+					}
+					fmt.Printf("Resize filesystem: %v to %v (+%v)\n", item.Path, formatSize(item.Size), formatSize(addSpace))
+				case "xfs":
+					var tmpMountPoint string
+					var mountPoint string
+					if mountPoint, _ = getMountPoint(item.Path); mountPoint == "" {
+						tmpMountPoint, err := ioutil.TempDir("", "")
+						if _, _, err = cmd("mount", "-t", "xfs", item.Path, tmpMountPoint); err != nil {
+							log.Printf("Can't xfs mount: %v", err)
+						}
+						mountPoint = tmpMountPoint
+					}
 
-				res, stderr, _ := cmd("xfs_growfs", mountPoint)
-				newSize, err := fsGetSizeXFS(item.Path)
+					res, stderr, _ := cmd("xfs_growfs", mountPoint)
+					newSize, err := fsGetSizeXFS(item.Path)
 
-				if tmpMountPoint != "" {
-					cmd("umount", tmpMountPoint)
-					os.Remove(tmpMountPoint)
-				}
+					if tmpMountPoint != "" {
+						cmd("umount", tmpMountPoint)
+						os.Remove(tmpMountPoint)
+					}
 
-				if err != nil {
-					log.Printf("ATTENTION: Can't read new size after fs resize. Log of resize:\nstdout:%v\nstderr:%v\n", res, stderr)
-					continue
+					if err != nil {
+						log.Printf("ATTENTION: Can't read new size after fs resize. Log of resize:\nstdout:%v\nstderr:%v\n", res, stderr)
+						continue retryLoop4
+					}
+					addSpace := newSize - item.Size
+					item.FreeSpace -= addSpace
+					item.Size = newSize
+					if addSpace == 0 {
+						log.Printf("Filesystem doesn't extend. Log of resize:\nstdout: %v\nstderr: %v\n", res, stderr)
+						continue retryLoop4
+					}
+					fmt.Printf("Resize filesystem: %v to %v (+%v)\n", item.Path, formatSize(item.Size), formatSize(addSpace))
+				default:
+					log.Println("I don't know the filesystem: ", item.Path, item.FSType)
 				}
-				addSpace := newSize - item.Size
-				item.FreeSpace -= addSpace
-				item.Size = newSize
-				if addSpace == 0 {
-					log.Printf("Filesystem doesn't extend. Log of resize:\nstdout: %v\nstderr: %v\n", res, stderr)
-					continue
-				}
-				fmt.Printf("Resize filesystem: %v to %v (+%v)\n", item.Path, formatSize(item.Size), formatSize(addSpace))
-			default:
-				log.Println("I don't know the filesystem: ", item.Path, item.FSType)
 			}
 		default:
 			log.Println("I don't know way to resize type: ", item.Type)
