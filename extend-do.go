@@ -22,10 +22,16 @@ func extendPrint(plan []storageItem) {
 		if item.Child != -1 {
 			addSize[item.Child] += item.FreeSpace
 		}
-		if item.Type == type_PARTITION && item.FreeSpace > 0 {
-			fmt.Println(strconv.Itoa(i)+": ", item, "May need reboot")
-		} else {
-			fmt.Println(strconv.Itoa(i)+": ", item)
+		fmt.Print(strconv.Itoa(i) + ": ")
+		switch item.Type {
+		case type_PARTITION:
+			fmt.Println(item, "May need reboot")
+		case type_PARTITION_NEW:
+			if item.Partition.Disk.PartTable == "msdos" && item.Partition.Number > 4 {
+				fmt.Println("!!! ATTENTION, Can't create more then 4 partition in msdos table. Skip it. ", item)
+			}
+		default:
+			fmt.Println(item)
 		}
 	}
 }
@@ -41,7 +47,7 @@ func extendDo(plan []storageItem) (needReboot bool) {
 			switch item.Partition.Disk.PartTable {
 			case "msdos":
 				if item.Partition.Number > 4 {
-					log.Println("WARNING: Can't work with partition number > 4 in msdos partition table.")
+					log.Println("WARNING: Can't work with partition number > 4 in msdos partition table. Skip it.")
 					continue
 				}
 				diskIO, err := os.OpenFile(item.Partition.Disk.Path, os.O_RDONLY|os.O_SYNC, 0)

@@ -149,9 +149,6 @@ partNumLoop:
 				continue partNumLoop
 			}
 		}
-		if partNum > disk.MaxPartitionCount {
-			return 0
-		}
 		diskNewPartitionNumLastGeneratedNum[mm] = partNum
 		return partNum
 	}
