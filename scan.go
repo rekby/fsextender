@@ -104,6 +104,9 @@ func (p partition) Size() uint64 {
 func (p partition) IsFreeSpace() bool {
 	return p.Number == 0
 }
+func (p partition) makePath() string {
+	return p.Disk.Path + strconv.FormatUint(uint64(p.Number), 10)
+}
 
 type lvmPV struct {
 	Path        string
@@ -590,8 +593,9 @@ diskLoop:
 					continue
 				}
 				newPartition := partition{Disk: &disk_copy, FirstByte: part.FirstByte, LastByte: part.LastByte,
-					Path: disk.Path + strconv.FormatUint(uint64(partNum), 10), Number: partNum,
+					Number: partNum,
 				}
+				newPartition.Path = newPartition.makePath()
 				res = append(res, newPartition)
 			}
 		}
@@ -750,7 +754,7 @@ func readDiskInfo(path string) (disk diskInfo, err error) {
 				return
 			}
 			part.Number = uint32(partNumber64)
-			part.Path = disk.Path + strconv.FormatUint(uint64(part.Number), 10)
+			part.Path = part.makePath()
 		}
 		disk.Partitions = append(disk.Partitions, part)
 	}

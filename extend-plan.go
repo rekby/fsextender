@@ -14,9 +14,9 @@ storage - описание иерархии и возможных путей р�
 */
 func extendPlan(storage []storageItem) (plan []storageItem) {
 	/*
-	When it can create new partition or extend current partition - always select extend.
-	Если есть возможность расширить существующий раздел и создать новый на этом же месте - выбираем расширение
-	уже сущуствующего
+		When it can create new partition or extend current partition - always select extend.
+		Если есть возможность расширить существующий раздел и создать новый на этом же месте - выбираем расширение
+		уже сущуствующего
 	*/
 	for i, item := range storage {
 		// For every partition, what can be extended
@@ -50,6 +50,37 @@ func extendPlan(storage []storageItem) (plan []storageItem) {
 				// Cancel create partition
 				// Выключаем создание нового раздела из дальнейшей работы
 				storage[newI].Type = type_UNKNOWN
+
+				// Decrease created partnumbers after this
+				// Уменьшаем номера далее создаваемых разделов на этом же диске
+				prevNum := newItem.Partition.Number
+				diskMajor, diskMinor := newItem.Partition.Disk.Major, newItem.Partition.Disk.Minor
+				changedPartitionPathes := make(map[string]string)
+				for fixPartNumbersI := range storage {
+					fixPartNumbersItem := &storage[fixPartNumbersI]
+					part := &fixPartNumbersItem.Partition
+					if fixPartNumbersItem.Type != type_PARTITION_NEW ||
+						part.Disk.Major != diskMajor || part.Disk.Minor != diskMinor ||
+						part.Number <= prevNum {
+						continue
+					}
+
+					oldPath := fixPartNumbersItem.Path
+					currentPartNum := part.Number
+					part.Number = prevNum
+					part.Path = part.makePath()
+					fixPartNumbersItem.Path = part.Path
+					prevNum = currentPartNum
+					changedPartitionPathes[oldPath] = fixPartNumbersItem.Path
+				}
+
+				// Fix pathes of underliing of changed partitions
+				// Пройтись по плану и поправить пути к разделам у которых изменились пути
+				for fixPartPathesI := range storage {
+					if newPath, ok := changedPartitionPathes[storage[fixPartPathesI].Path]; ok {
+						storage[fixPartPathesI].Path = newPath
+					}
+				}
 			}
 		}
 	}

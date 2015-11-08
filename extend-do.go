@@ -352,13 +352,14 @@ func extendDo(plan []storageItem) (needReboot bool) {
 						continue retryLoop4
 					}
 					addSpace := newSize - item.Size
-					item.FreeSpace -= addSpace
-					item.Size = newSize
 					if addSpace == 0 {
 						log.Printf("Filesystem doesn't extend. Log of resize:\nstdout: %v\nstderr: %v\n", res, stderr)
 						continue retryLoop4
 					}
+					item.FreeSpace -= addSpace
+					item.Size = newSize
 					fmt.Printf("Resize filesystem: %v to %v (+%v)\n", item.Path, formatSize(item.Size), formatSize(addSpace))
+					break retryLoop4
 				case "xfs":
 					var tmpMountPoint string
 					var mountPoint string
@@ -390,6 +391,7 @@ func extendDo(plan []storageItem) (needReboot bool) {
 						continue retryLoop4
 					}
 					fmt.Printf("Resize filesystem: %v to %v (+%v)\n", item.Path, formatSize(item.Size), formatSize(addSpace))
+					break retryLoop4
 				default:
 					log.Println("I don't know the filesystem: ", item.Path, item.FSType)
 				}
