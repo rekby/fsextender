@@ -739,7 +739,7 @@ func readDiskInfo(path string) (disk diskInfo, err error) {
 		typeS = strings.TrimSuffix(typeS, ";")
 		part := partition{Disk: &disk}
 		if part.FirstByte, err = parseUint(firstByteS[:len(firstByteS)-1]); err != nil {
-			log.Println("Can't parse partition fiest byte: ", disk, line, err)
+			log.Println("Can't parse partition first byte: ", disk, line, err)
 			return
 		}
 		if part.LastByte, err = parseUint(lastByteS[:len(lastByteS)-1]); err != nil {
