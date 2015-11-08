@@ -159,27 +159,28 @@ func extendScanWays(startPoint string) (storage []storageItem, err error) {
 	startPoint = filepath.Clean(startPoint)
 	scanLVM()
 
-	// Check if startPoint is mount point of file system. If yes - find mounted device.
-	// проверяем является ли startPoint точкой монтирования. Если да - находим смонтированное устройство
+	// Check if startPoint is mount point of file system. If yes - find mounted device. Take last mount line.
+	// проверяем является ли startPoint точкой монтирования. Если да - находим смонтированное устройство.
+	// Если подходящих строк монтирования несколько - берём последнюю строку.
 	mountsBytes, err := ioutil.ReadFile("/proc/mounts")
 	if err != nil {
 		return
 	}
-	for isMountPoint := true; isMountPoint; {
-		isMountPoint = false
-		for _, lineBytes := range bytes.Split(mountsBytes, []byte("\n")) {
-			parts := bytes.Split(lineBytes, []byte(" "))
-			if len(parts) < 3 {
-				// empty line
-				continue
-			}
-			to := parts[1]
-			if string(to) == startPoint {
-				startPoint = string(parts[0])
-				isMountPoint = true
-				break
-			}
+	mountFrom := ""
+	for _, lineBytes := range bytes.Split(mountsBytes, []byte("\n")) {
+		parts := bytes.Split(lineBytes, []byte(" "))
+		if len(parts) < 3 {
+			// empty line
+			continue
 		}
+		from := parts[0]
+		to := parts[1]
+		if string(to) == startPoint {
+			mountFrom = string(from)
+		}
+	}
+	if mountFrom != "" {
+		startPoint = mountFrom
 	}
 	storage = make([]storageItem, 0)
 
