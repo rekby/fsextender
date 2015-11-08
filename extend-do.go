@@ -303,7 +303,7 @@ func extendDo(plan []storageItem) (needReboot bool) {
 			}
 		case type_LVM_PV:
 		retryLoop:
-			for retry := 9; retry < TRY_COUNT; retry++ {
+			for retry := 0; retry < TRY_COUNT; retry++ {
 				if retry > 0 {
 					log.Println("Try to resize LVM PV once more:", item.Path)
 				}
