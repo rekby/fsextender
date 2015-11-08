@@ -156,6 +156,7 @@ partNumLoop:
 }
 
 func extendScanWays(startPoint string) (storage []storageItem, err error) {
+	startPoint = filepath.Clean(startPoint)
 	scanLVM()
 
 	// Check if startPoint is mount point of file system. If yes - find mounted device.
