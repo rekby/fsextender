@@ -19,3 +19,5 @@ external dependencies:
 blkid - detect file system type
 stat - detect major,minor number of device
 parted - manipulate with partition tables
+blockdev - get sector size of disk - need for manipulate with partition tables.
+partprobe - reread partition table after changes. TODO: replace with blockdev --rereadadpt

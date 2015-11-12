@@ -107,7 +107,7 @@ func extendDo(plan []storageItem) (needReboot bool) {
 					diskIO.Close()
 					continue
 				}
-				gptTable, err := gpt.ReadTable(diskIO, uint32(item.Partition.Disk.SectorSizeLogical))
+				gptTable, err := gpt.ReadTable(diskIO, item.Partition.Disk.SectorSizeLogical)
 				if err != nil {
 					log.Println("Can't read gpt table: ", item.Path, err)
 					diskIO.Close()
@@ -239,7 +239,7 @@ func extendDo(plan []storageItem) (needReboot bool) {
 					diskIO.Close()
 					continue
 				}
-				gptTable, err := gpt.ReadTable(diskIO, uint32(item.Partition.Disk.SectorSizeLogical))
+				gptTable, err := gpt.ReadTable(diskIO, item.Partition.Disk.SectorSizeLogical)
 				if err != nil {
 					log.Println("Can't read gpt table, new partition: ", item.Partition.Disk.Path, err)
 					diskIO.Close()

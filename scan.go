@@ -5,11 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"github.com/rekby/gpt"
+	"github.com/rekby/mbr"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -90,12 +92,25 @@ type diskInfo struct {
 }
 
 type partition struct {
-	Disk              *diskInfo
-	Path              string
-	Number            uint32 // Partition numbers start start from 1. Value 0 mean free space
-	FirstByte         uint64
-	LastByte          uint64
-	ExtendedPartition bool
+	Disk      *diskInfo
+	Path      string
+	Number    uint32 // Partition numbers start start from 1. Value 0 mean free space
+	FirstByte uint64
+	LastByte  uint64
+}
+type partitionSortByFirstByte []partition
+
+// implement sort.Interface
+func (arr partitionSortByFirstByte) Len() int {
+	return len(arr)
+}
+func (arr partitionSortByFirstByte) Less(i, j int) bool {
+	return arr[i].FirstByte < arr[j].FirstByte
+}
+func (arr partitionSortByFirstByte) Swap(i, j int) {
+	tmpSwap := arr[i]
+	arr[i] = arr[j]
+	arr[j] = tmpSwap
 }
 
 func (p partition) Size() uint64 {
@@ -710,80 +725,121 @@ func parseUint(s string) (res uint64, err error) {
 func readDiskInfo(path string) (disk diskInfo, err error) {
 	disk.Path = path
 	disk.Major, disk.Minor = getMajorMinor(path)
-	lines := cmdTrimLines("parted", "-ma", "optimal", path, "unit", "B", "print", "free")
-	for _, line := range lines {
-		if line == "" {
-			continue
-		}
-		lineParts := strings.Split(strings.TrimSpace(line), ":")
-		// Title line
-		// Заголовочная строка
-		if lineParts[0] == path {
-			if disk.Size, err = parseUint(lineParts[1][:len(lineParts[1])-1]); err != nil {
-				log.Println("Can't parse disk size: ", path, line, err)
-				return
-			}
-			if disk.SectorSizeLogical, err = parseUint(lineParts[3]); err != nil {
-				log.Println("Can't parse disk sector size: ", path, line, err)
-				return
-			}
-			disk.PartTable = lineParts[5]
-			continue
-		}
-		if len(lineParts) < 5 {
-			continue
-		}
-		numS, firstByteS, lastByteS, typeS := lineParts[0], lineParts[1], lineParts[2], lineParts[4]
-		typeS = strings.TrimSuffix(typeS, ";")
-		part := partition{Disk: &disk}
-		if part.FirstByte, err = parseUint(firstByteS[:len(firstByteS)-1]); err != nil {
-			log.Println("Can't parse partition first byte: ", disk, line, err)
-			return
-		}
-		if part.LastByte, err = parseUint(lastByteS[:len(lastByteS)-1]); err != nil {
-			log.Println("Can't parse partition last byte", disk, line, err)
-			return
-		}
-		if typeS != "free" {
-			var partNumber64 uint64
-			partNumber64, err = parseUint(numS)
-			if err != nil || partNumber64 > MAX_UINT32 {
-				log.Println("Can't parse partition number: ", disk, line, err)
-				return
-			}
-			part.Number = uint32(partNumber64)
-			part.Path = part.makePath()
-		}
-		disk.Partitions = append(disk.Partitions, part)
-	}
 
-	if disk.PartTable != "msdos" && disk.PartTable != "gpt" {
-		err = fmt.Errorf("I can work with msdos/gpt table only. Now it is: %v(%v)", disk.PartTable, disk.Path)
+	blockSizeString, _, _ := cmd("blockdev", "--getss", disk.Path)
+	disk.SectorSizeLogical, err = strconv.ParseUint(strings.TrimSpace(blockSizeString), 10, 64)
+	if err != nil {
+		log.Println("Can't get block size:", disk.Path, err)
 		return
 	}
 
-	if disk.PartTable == "gpt" {
-		var diskIO *os.File
-		diskIO, err = os.Open(path)
-		defer diskIO.Close()
-		if err != nil {
-			return
-		}
-		_, err = diskIO.Seek(int64(disk.SectorSizeLogical), 0)
-		if err != nil {
-			return
-		}
-		var gptTable gpt.Table
-		gptTable, err = gpt.ReadTable(diskIO, uint32(disk.SectorSizeLogical))
-		diskIO.Close()
-		if err != nil {
-			return
-		}
-		disk.MaxPartitionCount = gptTable.Header.PartitionsArrLen
-	} else {
-		disk.MaxPartitionCount = 4
+	diskSizeString, _, _ := cmd("blockdev", "--getsize64", disk.Path)
+	disk.Size, err = strconv.ParseUint(strings.TrimSpace(diskSizeString), 10, 64)
+	if err != nil {
+		log.Println("Can't get disk size:", disk.Path, err)
+		return
 	}
 
+	diskFile, err := os.Open(disk.Path)
+	defer diskFile.Close()
+
+	if err != nil {
+		log.Println("Error open disk: ", disk.Path, err)
+		return
+	}
+
+	var firstUsableDiskByte uint64
+	var lastUsableDiskByte uint64
+
+	// Try read mbr
+	mbrTable, err := mbr.Read(diskFile)
+	if err != nil {
+		log.Println("Can't read mbr table")
+		return
+	}
+	if mbrTable.IsGPT() {
+		disk.PartTable = "gpt"
+		var gptTable gpt.Table
+		gptTable, err = gpt.ReadTable(diskFile, disk.SectorSizeLogical)
+		if err != nil {
+			log.Println("Can't read gpt table: ", disk.Path, err)
+			return
+		}
+		firstUsableDiskByte = gptTable.Header.FirstUsableLBA * disk.SectorSizeLogical
+		lastUsableDiskByte = gptTable.Header.LastUsableLBA*disk.SectorSizeLogical + disk.SectorSizeLogical - 1
+		for i, gptPart := range gptTable.Partitions {
+			if gptPart.IsEmpty() {
+				continue
+			}
+			part := partition{
+				Disk:      &disk,
+				Number:    uint32(i + 1),
+				FirstByte: gptPart.FirstLBA * disk.SectorSizeLogical,
+				LastByte:  gptPart.LastLBA*disk.SectorSizeLogical + disk.SectorSizeLogical - 1,
+			}
+			part.Path = part.makePath()
+			disk.Partitions = append(disk.Partitions, part)
+		}
+	} else {
+		disk.PartTable = "msdos"
+		firstUsableDiskByte = 512 * 63 // As parted - flign for can convert to GPT in feauture.
+		lastUsableDiskByte = disk.Size - 1
+		for i, mbrPart := range mbrTable.GetAllPartitions() {
+			if mbrPart.IsEmpty() {
+				continue
+			}
+			part := partition{
+				Disk:      &disk,
+				Number:    uint32(i + 1),
+				FirstByte: uint64(mbrPart.GetLBAStart()) * disk.SectorSizeLogical,
+				LastByte:  (uint64(mbrPart.GetLBAStart())+uint64(mbrPart.GetLBALen()))*disk.SectorSizeLogical - 1,
+			}
+			part.Path = part.makePath()
+			disk.Partitions = append(disk.Partitions, part)
+		}
+	}
+
+	// number of partition doesn't depend from order on disk. Sort it by disk order.
+	sort.Sort(partitionSortByFirstByte(disk.Partitions))
+
+	// Fix first usable byte (need for non aligned mgr partitions)
+	if len(disk.Partitions) > 0 && firstUsableDiskByte < disk.Partitions[0].FirstByte && disk.Partitions[0].FirstByte < min_SIZE_NEW_PARTITION {
+		firstUsableDiskByte = disk.Partitions[0].FirstByte
+	}
+
+	// make free space pseudo partitions
+	newPartitions := make([]partition, 0)
+	var lastByte = firstUsableDiskByte - 1
+	for i, part := range disk.Partitions {
+		switch {
+		case lastByte == part.FirstByte-1:
+			newPartitions = append(newPartitions, part)
+		case lastByte < part.FirstByte-1:
+			newPart := partition{
+				Disk:      &disk,
+				Number:    0,
+				FirstByte: lastByte + 1,
+				LastByte:  part.FirstByte - 1,
+			}
+			newPartitions = append(newPartitions, newPart, part)
+		default:
+			log.Printf("ERROR!!!! Have overlap partitions!!!!\n%v - %v\n%#v", disk.Path, i, disk.Partitions)
+			err = fmt.Errorf("OVERLAP PARTITIONS")
+			return
+		}
+		lastByte = part.LastByte
+	}
+
+	if lastByte < lastUsableDiskByte {
+		newPart := partition{
+			Disk:      &disk,
+			Number:    0,
+			FirstByte: lastByte + 1,
+			LastByte:  lastUsableDiskByte,
+		}
+		newPartitions = append(newPartitions, newPart)
+	}
+	disk.Partitions = newPartitions
 	return
 }
 
