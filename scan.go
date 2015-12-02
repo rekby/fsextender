@@ -727,10 +727,9 @@ func readDiskInfo(path string) (disk diskInfo, err error) {
 		return
 	}
 
-	diskSizeString, _, _ := cmd("blockdev", "--getsize64", disk.Path)
-	disk.Size, err = strconv.ParseUint(strings.TrimSpace(diskSizeString), 10, 64)
-	if err != nil {
-		log.Println("Can't get disk size:", disk.Path, err)
+	disk.Size = getDiskSize(disk.Path)
+	if disk.Size == 0 {
+		log.Println("Can't get disk size:", disk.Path)
 		return
 	}
 
