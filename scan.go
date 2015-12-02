@@ -782,7 +782,7 @@ func readDiskInfo(path string) (disk diskInfo, err error) {
 		}
 	} else {
 		disk.PartTable = "msdos"
-		firstUsableDiskByte = 512 * 63 // As parted - flign for can convert to GPT in feauture.
+		firstUsableDiskByte = 512 * 63 // As parted - align for can convert to GPT in feauture.
 		lastUsableDiskByte = disk.Size - 1
 		for i, mbrPart := range mbrTable.GetAllPartitions() {
 			if mbrPart.IsEmpty() {
