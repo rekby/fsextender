@@ -451,6 +451,17 @@ func fsGetSizeXFS(path string) (size uint64, err error) {
 	return 0, fmt.Errorf("I can't find size of xfs filesystem: ", path)
 }
 
+// Return size of block device as it showed by kernel (in bytes)
+func getDiskSize(path string) uint64 {
+	res, _, _ := cmd("blockdev", "--getsize64", path)
+	size, err := parseUint(strings.TrimSpace(res))
+	if err != nil {
+		log.Println("Can't read block device size:", path, err)
+		return 0
+	}
+	return size
+}
+
 // return slice if all finded LVM PV
 // Возвращает список всех известных lvmPV
 func getLvmPV() []lvmPV {
@@ -473,23 +484,6 @@ func getLvmPV() []lvmPV {
 			continue
 		}
 		res = append(res, lvmPV{Path: lineParts[0], VolumeGroup: lineParts[1], Size: size})
-	}
-	return res
-}
-
-// Return size of block device as it showed by kernel (in sectors)
-func getKernelSize(path string) uint64 {
-	major, minor := getMajorMinor(path)
-	sizePath := filepath.Join("/sys/dev/block", strconv.Itoa(major)+":"+strconv.Itoa(minor), "size")
-	fileBytes, err := ioutil.ReadFile(sizePath)
-	if err != nil {
-		log.Println("Error read get kernel size: ", path, major, minor, sizePath, err)
-		return 0
-	}
-	res, err := parseUint(strings.TrimSpace(string(fileBytes)))
-	if err != nil {
-		log.Println("Error parseUint while get kernel size of device", path, "'"+strings.TrimSpace(string(fileBytes))+"'", err)
-		return 0
 	}
 	return res
 }

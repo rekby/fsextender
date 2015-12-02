@@ -44,7 +44,7 @@ func extendDo(plan []storageItem) (needReboot bool) {
 		item := &plan[i]
 		switch item.Type {
 		case type_PARTITION:
-			oldKernelSize := getKernelSize(item.Path)
+			oldKernelSize := getDiskSize(item.Path)
 			oldFreeSpace := item.FreeSpace
 			switch item.Partition.Disk.PartTable {
 			case "msdos":
@@ -153,7 +153,7 @@ func extendDo(plan []storageItem) (needReboot bool) {
 				continue
 			}
 			cmd("partprobe", item.Partition.Disk.Path)
-			newKernelSize := getKernelSize(item.Path)
+			newKernelSize := getDiskSize(item.Path)
 			if oldKernelSize == newKernelSize && oldFreeSpace != 0 {
 				log.Println("NEED REBOOT!")
 				needReboot = true
