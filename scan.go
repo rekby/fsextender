@@ -362,6 +362,22 @@ toScanLoop:
 		}
 	}
 
+	// Fix free space for extend filesystem. We can't detect it while scan - on the step the program doesn't know partition/LVM size
+	// Поправить свободной место файловой системы - оно не может быть определено просто во время, т.к. на этом шаге программа еще не знает размера нижележащего раздела/LVM
+	for _, item := range storage {
+		if item.Child != -1 && storage[item.Child].Type == type_FS {
+			fs := &storage[item.Child]
+			switch {
+			case item.Size > fs.Size:
+				fs.FreeSpace += item.Size - fs.Size
+			case item.Size < fs.Size:
+				log.Printf("WARNING: Filesystem size (%v) more then underliing layer (%v, %v)\n", fs.Path, item.Type, item.Path)
+			case item.Size == fs.Size:
+				// do nothing
+			}
+		}
+	}
+
 	return storage, err
 }
 
