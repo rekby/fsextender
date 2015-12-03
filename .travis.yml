@@ -4,5 +4,5 @@ dist: trusty
 language: go
 go:
     - 1.0
-    - tip
+    - 1.5
 
