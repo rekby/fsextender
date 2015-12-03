@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/rekby/fsextender.svg)](https://travis-ci.org/rekby/fsextender)
+
 Extend filesystem to max size.
 
 If filesystem lie on LVM-volume - extend lvm volume and lvm volume group to max size too (extend partitions, create new
