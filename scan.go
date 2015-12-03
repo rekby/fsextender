@@ -729,7 +729,7 @@ func lvmPVGetSizeTry(path string) uint64 {
 	cmd := exec.Command("pvs", "-o", "pv_size", "--units", "B", "--separator", "|", "--noheading", path)
 	cmd.Stdout = buf
 	cmd.Run()
-	line := strings.TrimSuffix(strings.TrimSpace(buf.String()), "B")
+	line := trimSuffixB(strings.TrimSpace(buf.String()))
 	pvSize, err := strconv.ParseUint(line, 10, 64)
 	if err != nil {
 		log.Println("Can't parse pv size: ", path, line, err)
@@ -745,9 +745,9 @@ func lvmVGGetSize(vgName string) (size, freeSize, extentSize uint64) {
 	for _, line := range res {
 		lineParts := strings.Split(line, "/")
 		if lineParts[0] == vgName {
-			size, _ = parseUint(strings.TrimSuffix(lineParts[1], "B"))
-			freeSize, _ = parseUint(strings.TrimSuffix(lineParts[2], "B"))
-			extentSize, _ = parseUint(strings.TrimSuffix(lineParts[3], "B"))
+			size, _ = parseUint(trimSuffixB(lineParts[1]))
+			freeSize, _ = parseUint(trimSuffixB(lineParts[2]))
+			extentSize, _ = parseUint(trimSuffixB(lineParts[3]))
 			return
 		}
 	}
@@ -912,4 +912,13 @@ func scanLVM() {
 		}
 		majorMinorDeviceTypeCache[[2]int{major, minor}] = storageItem{Path: path, Type: type_LVM_LV, Size: size}
 	}
+}
+
+// Trim B in end of line
+func trimSuffixB(s string) string {
+	l := len(s)
+	if l > 0 && s[l-1] == 'B' {
+		return s[:l-1]
+	}
+	return s
 }
