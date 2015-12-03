@@ -453,13 +453,24 @@ func fsGetSizeXFS(path string) (size uint64, err error) {
 
 // Return size of block device as it showed by kernel (in bytes)
 func getDiskSize(path string) uint64 {
-	res, _, _ := cmd("blockdev", "--getsize64", path)
-	size, err := parseUint(strings.TrimSpace(res))
-	if err != nil {
-		log.Println("Can't read block device size:", path, err)
-		return 0
+	for i := 0; i < TRY_COUNT; i++ {
+		if i > 0 {
+			log.Println("Try to read devsize once more: ", path)
+			time.Sleep(time.Second)
+		}
+		res, errString, err := cmd("blockdev", "--getsize64", path)
+		if err != nil {
+			log.Println("Error while call blockdev: ", path, err, errString)
+			continue
+		}
+		size, err := parseUint(strings.TrimSpace(res))
+		if err == nil {
+			return size
+		} else {
+			log.Println("Can't read block device size:", path, err)
+		}
 	}
-	return size
+	return 0
 }
 
 // return slice if all finded LVM PV
