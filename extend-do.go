@@ -351,6 +351,10 @@ func extendDo(plan []storageItem) (needReboot bool) {
 		case type_FS:
 		retryLoop4:
 			for retry := 0; retry < TRY_COUNT; retry++ {
+				if retry > 0 {
+					log.Println("Sleep a second before retry.")
+					time.Sleep(time.Second)
+				}
 				switch item.FSType {
 				case "ext3", "ext4":
 					res, stderr, _ := cmd("resize2fs", "-f", item.Path)
@@ -372,11 +376,30 @@ func extendDo(plan []storageItem) (needReboot bool) {
 					var tmpMountPoint string
 					var mountPoint string
 					if mountPoint, _ = getMountPoint(item.Path); mountPoint == "" {
-						tmpMountPoint, err := ioutil.TempDir("", "")
-						if _, _, err = cmd("mount", "-t", "xfs", item.Path, tmpMountPoint); err != nil {
-							log.Printf("Can't xfs mount: %v", err)
+						var err error
+						tmpMountPoint, err = ioutil.TempDir("", "")
+						if err != nil {
+							log.Println("Can't create tmp mount point for xfs.")
+							continue retryLoop4
 						}
-						mountPoint = tmpMountPoint
+						var errString string
+					xfsMountLoop:
+						for retryXFSMount := 0; retryXFSMount < TRY_COUNT; retryXFSMount++ {
+							if retryXFSMount > 0 {
+								log.Println("Retry mount xfs volume")
+								time.Sleep(time.Second)
+							}
+							if _, errString, err = cmd("mount", "-t", "xfs", item.Path, tmpMountPoint); err == nil {
+								mountPoint = tmpMountPoint
+								break xfsMountLoop
+							}
+							log.Printf("Can't xfs mount: %v (%v) ('%v' -> '%v')", err, errString, item.Path, tmpMountPoint)
+							if retryXFSMount == TRY_COUNT-1 {
+								// При последней попытке - удаляем временную точку монтирования
+								os.Remove(tmpMountPoint)
+								break retryLoop4
+							}
+						}
 					}
 
 					res, stderr, _ := cmd("xfs_growfs", mountPoint)

@@ -416,7 +416,7 @@ func fsGetSizeXFS(path string) (size uint64, err error) {
 	if _, err = getMountPoint(path); err != nil {
 		tmpMountPath, err = ioutil.TempDir("", "")
 		if _, _, err = cmd("mount", "-t", "xfs", path, tmpMountPath); err != nil {
-			return 0, fmt.Errorf("Can't xfs mount: %v", err)
+			return 0, fmt.Errorf("(fsGetSizeXFS) Can't xfs mount: %v", err)
 		}
 	}
 
