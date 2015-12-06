@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +17,10 @@ const TMP_DIR = "/tmp"
 const TMP_MOUNT_DIR = "/tmp/fsextender-test-mount-dir"
 const LVM_VG_NAME = "test-fsextender-lvm-vg"
 const LVM_LV_NAME = "test-fsextender-lvm-lv"
+
+const START_PART_BYTE = 32256
+const MSDOS_LAST_BYTE = 107374182399
+const GPT_LAST_BYTE = 107374165503
 
 var PART_TABLES = []string{"msdos", "gpt"}
 
@@ -124,6 +129,10 @@ func readPartitions(path string) (res []testPartition) {
 	return
 }
 
+func s(n uint64) string {
+	return strconv.FormatUint(n, 10)
+}
+
 func sudo(command string, args ...string) (res string, errString string, err error) {
 	args = append([]string{command}, args...)
 	return cmd("sudo", args...)
@@ -136,7 +145,7 @@ func TestExt4PartitionMSDOS(t *testing.T) {
 	}
 	defer deleteTmpDevice(disk)
 
-	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", "32256", "1073774080") // 1Gb
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(START_PART_BYTE), s(START_PART_BYTE+GB)) // 1Gb
 	part := disk + "p1"
 	sudo("mkfs.ext4", part)
 	err = os.MkdirAll(TMP_MOUNT_DIR, 0700)
@@ -166,7 +175,7 @@ func TestExt4PartitionMSDOS(t *testing.T) {
 	}
 
 	needPartitions := []testPartition{
-		{1, 32256, 107374182399},
+		{1, START_PART_BYTE, MSDOS_LAST_BYTE},
 	}
 
 	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
@@ -190,7 +199,7 @@ func TestExt4PartitionGPT(t *testing.T) {
 	}
 	defer deleteTmpDevice(disk)
 
-	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", "32256", "1073774080") // 1Gb
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(START_PART_BYTE), s(START_PART_BYTE+GB)) // 1Gb
 	part := disk + "p1"
 	sudo("mkfs.ext4", part)
 	err = os.MkdirAll(TMP_MOUNT_DIR, 0700)
@@ -220,7 +229,7 @@ func TestExt4PartitionGPT(t *testing.T) {
 	}
 
 	needPartitions := []testPartition{
-		{1, 32256, 107374165503},
+		{1, START_PART_BYTE, GPT_LAST_BYTE},
 	}
 	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
 	if partDiff != nil {
@@ -244,7 +253,7 @@ func TestXfsPartitionMSDOS(t *testing.T) {
 	}
 	defer deleteTmpDevice(disk)
 
-	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", "32256", "1073774080") // 1Gb
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(START_PART_BYTE), s(START_PART_BYTE+GB)) // 1Gb
 	part := disk + "p1"
 	sudo("mkfs.xfs", part)
 	err = os.MkdirAll(TMP_MOUNT_DIR, 0700)
@@ -274,7 +283,7 @@ func TestXfsPartitionMSDOS(t *testing.T) {
 	}
 
 	needPartitions := []testPartition{
-		{1, 32256, 107374182399},
+		{1, START_PART_BYTE, MSDOS_LAST_BYTE},
 	}
 	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
 	if partDiff != nil {
@@ -296,7 +305,7 @@ func TestXfsPartitionGPT(t *testing.T) {
 	}
 	defer deleteTmpDevice(disk)
 
-	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", "32256", "1073774080") // 1Gb
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(START_PART_BYTE), s(START_PART_BYTE+GB)) // 1Gb
 	part := disk + "p1"
 	sudo("mkfs.xfs", part)
 	err = os.MkdirAll(TMP_MOUNT_DIR, 0700)
@@ -326,7 +335,7 @@ func TestXfsPartitionGPT(t *testing.T) {
 	}
 
 	needPartitions := []testPartition{
-		{1, 32256, 107374165503},
+		{1, START_PART_BYTE, GPT_LAST_BYTE},
 	}
 
 	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
@@ -349,7 +358,7 @@ func TestLVMPartitionMSDOS(t *testing.T) {
 	}
 	defer deleteTmpDevice(disk)
 
-	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", "32256", "1073774080") // 1Gb
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(START_PART_BYTE), s(START_PART_BYTE+GB)) // 1Gb
 	sudo("parted", "-s", disk, "set", "1", "lvm", "on")
 
 	part := disk + "p1"
@@ -383,7 +392,7 @@ func TestLVMPartitionMSDOS(t *testing.T) {
 	}
 
 	needPartitions := []testPartition{
-		{1, 32256, 107374182399},
+		{1, 32256, MSDOS_LAST_BYTE},
 	}
 	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
 	if partDiff != nil {
@@ -406,7 +415,7 @@ func TestLVMPartitionGPT(t *testing.T) {
 	}
 	defer deleteTmpDevice(disk)
 
-	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", "32256", "1073774080") // 1Gb
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(START_PART_BYTE), s(START_PART_BYTE+GB)) // 1Gb
 	sudo("parted", "-s", disk, "set", "1", "lvm", "on")
 
 	part := disk + "p1"
@@ -440,7 +449,7 @@ func TestLVMPartitionGPT(t *testing.T) {
 	}
 
 	needPartitions := []testPartition{
-		{1, 32256, 107374165503},
+		{1, START_PART_BYTE, GPT_LAST_BYTE},
 	}
 	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
 	if partDiff != nil {
