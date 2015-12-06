@@ -308,7 +308,7 @@ func TestXfsPartitionGPT(t *testing.T) {
 	blocksString = strings.TrimSuffix(blocksString, "G")
 	blocks, _ := parseUint(blocksString)
 	if blocks != 100 {
-		t.Error(resLines[1])
+		t.Errorf("%v[%v:%v]\n'%v'", resLines[1], blocksStart, blocksEnd, blocksString)
 	}
 
 	needPartitions := []testPartition{
