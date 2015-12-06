@@ -6,13 +6,18 @@ go:
     - 1.2
 #    - 1.5
 
+secure: "TIyZML/ZCRAabOqYlOubbsFN5v9P+yVVqhD8LUx0TenAWouh0CZ8mt3hwUcxF3vy+xphdTWOA+tpRhkyFHKLzntlBUTOFWmWrOL76MqrMk9ONQVCOalKUQPnofgc/00axzYflPfn9nIDYsACYLHvIimEw/nNNLVJygLoziyEwSOThKz4fIIc7EzLxPwBI/Lm811RUi8O+rvPiGrV2VwctiCAV+9j18yyCyletrY/DT4GPk1ruzhcE6Nh4gM3DJpJHk9dFVgHucfnnE4Xr//GOrvSUDRdaiqC6pMn7+f2DIVOmHvrTixHzJQBqmUyrnrB8NWQSEy4z4VK+QX77TU5hBx0ASAqyX697BqWfi4XP6vlWSpaZLq/PutuTveQa2l+qH7VPVx5GTGC9aeBAwXciF3AR8iEJkKLlrxkuQW884G9AqXAdDuCKPU8e/bpfj8UWuUYmScLeY/a89Ms6Ub3dKN+Mfsdt/agd2mYmp6CBqOq5TC0kBpzvskAhJiXNV42dB9wsjk/yZavJWXhkuzjoLmq/jcvsydo+we61zjG5GRwBgvegq6C62122+A7tMiVD7Rh9bqvwiRxnPQqjLubZTZfvVbUf4ORBgdhNNH2c1xu5Iq1VCICY8XpNXIMaPxbeFdB+9DQ58gus65U15m//4M9qNICoyqYpWzA3xPSOiw=" # For coveralls.io
+
 before_script:
     - sudo sed -i -s 's/Defaults.*/#&/' /etc/sudoers # preserve environment while sudo -E
     - sudo apt-get update
     - sudo apt-get install -y xfsprogs lvm2
-    - go get github.com/rekby/fsextender
-    - go install github.com/rekby/fsextender
-    - cp $GOPATH/bin/fsextender $HOME/gopath/src/github.com/rekby/fsextender
+    - go get -t github.com/rekby/fsextender
+    - go get golang.org/x/tools/cmd/cover # For coveralls.io
+    - go get github.com/mattn/goveralls   # For coveralls.io
 
 script:
-    - sudo -E go test -v
+    - sudo -E go test -v -covermode=count -coverprofile=coverage.out
+
+after_script:
+    - goveralls -coverprofile=coverage.out -service=travis-ci -repotoken $COVERALLS_TOKEN
