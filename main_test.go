@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/rekby/pretty"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -11,13 +12,22 @@ import (
 
 const GB = 1024 * 1024 * 1024
 const TMP_DIR = "/tmp"
+const TMP_MOUNT_DIR = "/tmp/fsextender-test-mount-dir"
 
 var PART_TABLES = []string{"msdos", "gpt"}
 
 type testPartition struct {
-	number uint64
-	start  uint64
-	last   uint64
+	Number uint64
+	Start  uint64
+	Last   uint64
+}
+
+// Call main program
+func call(args ...string) {
+	oldArgs := os.Args
+	os.Args = append(oldArgs[0:1], args...)
+	main()
+	os.Args = oldArgs
 }
 
 // Create loop-back test device with partition table
@@ -64,15 +74,18 @@ func deleteTmpDevice(path string) {
 	filePath = filePath[start+1 : finish]
 
 	cmd("sudo", "losetup", "-d", path)
-	os.Remove(path)
+	os.Remove(filePath)
 }
 
 func readPartitions(path string) (res []testPartition) {
-	lines := cmdTrimLines("sudo", "parted", "-s", path, "unit", "b", "print")
-
+	partedRes, _, _ := cmd("sudo", "parted", "-s", path, "unit", "b", "print")
+	lines := strings.Split(partedRes, "\n")
 	var numStart, numFinish, startStart, startFinish, endStart, endFinish int
 	var startParse = false
 	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
 		if strings.HasPrefix(line, "Number") {
 			numStart = 0
 			numFinish = strings.Index(line, "Start")
@@ -86,14 +99,14 @@ func readPartitions(path string) (res []testPartition) {
 		if !startParse {
 			continue
 		}
-
 		var partition testPartition
-		partition.number, _ = parseUint(strings.TrimSpace(line[numStart:numFinish]))
-		if partition.number == 0 {
+		partition.Number, _ = parseUint(strings.TrimSpace(line[numStart:numFinish]))
+		if partition.Number == 0 {
 			continue
 		}
-		partition.start, _ = parseUint(strings.TrimSpace(line[startStart:startFinish]))
-		partition.last, _ = parseUint(strings.TrimSpace(line[endStart:endFinish]))
+		partition.Start, _ = parseUint(strings.TrimSuffix(strings.TrimSpace(line[startStart:startFinish]), "B"))
+		partition.Last, _ = parseUint(strings.TrimSuffix(strings.TrimSpace(line[endStart:endFinish]), "B"))
+
 		res = append(res, partition)
 	}
 	return
@@ -105,12 +118,53 @@ func sudo(command string, args ...string) (res string, errString string, err err
 }
 
 func TestExt4Partition(t *testing.T) {
-	disk, err := createTmpDevice("msdos")
+	parttable := "msdos"
+	disk, err := createTmpDevice(parttable)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer deleteTmpDevice(disk)
 
 	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", "32256", "1073774080") // 1Gb
+	part := disk + "p1"
+	sudo("mkfs.ext4", part)
+	err = os.MkdirAll(TMP_MOUNT_DIR, 0700)
+	if err == nil {
+		defer os.Remove(TMP_MOUNT_DIR)
+	} else {
+		t.Fatal(err)
+	}
 
+	sudo("mount", part, TMP_MOUNT_DIR)
+	defer sudo("umount", part)
+	call(TMP_MOUNT_DIR, "--do")
+	res, _, _ := cmd("df", "-BG", part)
+	resLines := strings.Split(res, "\n")
+	blocksStart := strings.Index(resLines[0], "1G-blocks")
+	blocksEnd := blocksStart + len("1G-blocks")
+	blocksString := strings.TrimSpace(resLines[1][blocksStart:blocksEnd])
+	blocksString = strings.TrimSuffix(blocksString, "G")
+	blocks, _ := parseUint(blocksString)
+	if blocks != 99 {
+		t.Error(resLines[1])
+	}
+
+	var needPartitions []testPartition
+	switch parttable {
+	case "gpt":
+		needPartitions = []testPartition{
+			{1, 32256, 107374165503},
+		}
+	case "msdos":
+		needPartitions = []testPartition{
+			{1, 32256, 107374182399},
+		}
+	default:
+		t.Fatal()
+	}
+
+	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
+	if partDiff != nil {
+		t.Error(partDiff)
+	}
 }
