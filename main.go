@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -48,13 +49,14 @@ NEED REBOOT AND START ME ONCE AGAIN. - if need reboot and run command with same 
 }
 
 func cmd(cmd string, args ...string) (stdout, errout string, err error) {
-	fmt.Printf("CMD: '%v' '%v'\n", cmd, strings.Join(args, "' '"))
 	bufStd := &bytes.Buffer{}
 	bufErr := &bytes.Buffer{}
 	command := exec.Command(cmd, args...)
 	command.Stdout = bufStd
 	command.Stderr = bufErr
 	err = command.Run()
+	log.Printf("CMD: '%v' '%v'\n", cmd, strings.Join(args, "' '"))
+	log.Printf("RES: %v\nERR: %v\nERROR: %v\n", bufStd.String(), bufErr.String(), err)
 	return bufStd.String(), bufErr.String(), err
 }
 
