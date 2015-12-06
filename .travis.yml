@@ -1,7 +1,8 @@
 sudo: required
 dist: trusty
 
-before_script:
+install:
+    - go get github.com/rekby/fsextender
     - go install github.com/rekby/fsextender
     - cp $GOPATH/bin/fsextender $HOME/gopath/src/github.com/rekby/fsextender
 
