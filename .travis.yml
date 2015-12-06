@@ -1,8 +1,12 @@
 sudo: required
 dist: trusty
 
+install:
+    - go install github.com/rekby/fsextender
+    - cp $GOPATH/bin/fsextender $HOME/gopath/src/github.com/rekby/fsextender
+
 language: go
 go:
-    - 1.0
+    - 1.1
     - 1.5
 

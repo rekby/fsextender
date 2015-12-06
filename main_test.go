@@ -24,10 +24,7 @@ type testPartition struct {
 
 // Call main program
 func call(args ...string) {
-	oldArgs := os.Args
-	os.Args = append(oldArgs[0:1], args...)
-	main()
-	os.Args = oldArgs
+	sudo("./fsextender", args...)
 }
 
 // Create loop-back test device with partition table
