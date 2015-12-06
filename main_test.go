@@ -18,8 +18,9 @@ const TMP_MOUNT_DIR = "/tmp/fsextender-test-mount-dir"
 const LVM_VG_NAME = "test-fsextender-lvm-vg"
 const LVM_LV_NAME = "test-fsextender-lvm-lv"
 
-const START_PART_BYTE = 32256
+const MSDOS_START_BYTE = 32256
 const MSDOS_LAST_BYTE = 107374182399
+const GPT_START_BYTE = 0x4400
 const GPT_LAST_BYTE = 107374165503
 
 var PART_TABLES = []string{"msdos", "gpt"}
@@ -145,7 +146,7 @@ func TestExt4PartitionMSDOS(t *testing.T) {
 	}
 	defer deleteTmpDevice(disk)
 
-	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(START_PART_BYTE), s(START_PART_BYTE+GB)) // 1Gb
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(MSDOS_START_BYTE), s(MSDOS_START_BYTE+GB)) // 1Gb
 	part := disk + "p1"
 	sudo("mkfs.ext4", part)
 	err = os.MkdirAll(TMP_MOUNT_DIR, 0700)
@@ -175,7 +176,7 @@ func TestExt4PartitionMSDOS(t *testing.T) {
 	}
 
 	needPartitions := []testPartition{
-		{1, START_PART_BYTE, MSDOS_LAST_BYTE},
+		{1, MSDOS_START_BYTE, MSDOS_LAST_BYTE},
 	}
 
 	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
@@ -199,7 +200,7 @@ func TestExt4PartitionGPT(t *testing.T) {
 	}
 	defer deleteTmpDevice(disk)
 
-	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(START_PART_BYTE), s(START_PART_BYTE+GB)) // 1Gb
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(MSDOS_START_BYTE), s(MSDOS_START_BYTE+GB)) // 1Gb
 	part := disk + "p1"
 	sudo("mkfs.ext4", part)
 	err = os.MkdirAll(TMP_MOUNT_DIR, 0700)
@@ -229,7 +230,7 @@ func TestExt4PartitionGPT(t *testing.T) {
 	}
 
 	needPartitions := []testPartition{
-		{1, START_PART_BYTE, GPT_LAST_BYTE},
+		{1, MSDOS_START_BYTE, GPT_LAST_BYTE},
 	}
 	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
 	if partDiff != nil {
@@ -253,7 +254,7 @@ func TestXfsPartitionMSDOS(t *testing.T) {
 	}
 	defer deleteTmpDevice(disk)
 
-	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(START_PART_BYTE), s(START_PART_BYTE+GB)) // 1Gb
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(MSDOS_START_BYTE), s(MSDOS_START_BYTE+GB)) // 1Gb
 	part := disk + "p1"
 	sudo("mkfs.xfs", part)
 	err = os.MkdirAll(TMP_MOUNT_DIR, 0700)
@@ -283,7 +284,7 @@ func TestXfsPartitionMSDOS(t *testing.T) {
 	}
 
 	needPartitions := []testPartition{
-		{1, START_PART_BYTE, MSDOS_LAST_BYTE},
+		{1, MSDOS_START_BYTE, MSDOS_LAST_BYTE},
 	}
 	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
 	if partDiff != nil {
@@ -305,7 +306,7 @@ func TestXfsPartitionGPT(t *testing.T) {
 	}
 	defer deleteTmpDevice(disk)
 
-	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(START_PART_BYTE), s(START_PART_BYTE+GB)) // 1Gb
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(MSDOS_START_BYTE), s(MSDOS_START_BYTE+GB)) // 1Gb
 	part := disk + "p1"
 	sudo("mkfs.xfs", part)
 	err = os.MkdirAll(TMP_MOUNT_DIR, 0700)
@@ -335,7 +336,7 @@ func TestXfsPartitionGPT(t *testing.T) {
 	}
 
 	needPartitions := []testPartition{
-		{1, START_PART_BYTE, GPT_LAST_BYTE},
+		{1, MSDOS_START_BYTE, GPT_LAST_BYTE},
 	}
 
 	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
@@ -358,7 +359,7 @@ func TestLVMPartitionMSDOS(t *testing.T) {
 	}
 	defer deleteTmpDevice(disk)
 
-	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(START_PART_BYTE), s(START_PART_BYTE+GB)) // 1Gb
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(MSDOS_START_BYTE), s(MSDOS_START_BYTE+GB)) // 1Gb
 	sudo("parted", "-s", disk, "set", "1", "lvm", "on")
 
 	part := disk + "p1"
@@ -415,7 +416,7 @@ func TestLVMPartitionGPT(t *testing.T) {
 	}
 	defer deleteTmpDevice(disk)
 
-	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(START_PART_BYTE), s(START_PART_BYTE+GB)) // 1Gb
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(MSDOS_START_BYTE), s(MSDOS_START_BYTE+GB)) // 1Gb
 	sudo("parted", "-s", disk, "set", "1", "lvm", "on")
 
 	part := disk + "p1"
@@ -449,11 +450,129 @@ func TestLVMPartitionGPT(t *testing.T) {
 	}
 
 	needPartitions := []testPartition{
-		{1, START_PART_BYTE, GPT_LAST_BYTE},
+		{1, MSDOS_START_BYTE, GPT_LAST_BYTE},
 	}
 	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
 	if partDiff != nil {
 		t.Error(partDiff)
+	}
+
+	testBytes, err := ioutil.ReadFile(filepath.Join(TMP_MOUNT_DIR, "test"))
+	if err != nil {
+		t.Error("Can't read test file", err)
+	}
+	if string(testBytes) != "OK" {
+		t.Error("Bad file content:", string(testBytes))
+	}
+}
+
+func TestLVMPartitionInMiddleDiskMSDOS(t *testing.T) {
+	disk, err := createTmpDevice("msdos")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer deleteTmpDevice(disk)
+
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(5*GB), s(6*GB))
+	sudo("parted", "-s", disk, "set", "1", "lvm", "on")
+
+	part := disk + "p1"
+	sudo("pvcreate", part)
+	sudo("vgcreate", LVM_VG_NAME, part)
+	defer sudo("vgremove", "-f", LVM_VG_NAME)
+	sudo("lvcreate", "-L", "500M", "-n", LVM_LV_NAME, LVM_VG_NAME)
+	lvmLV := filepath.Join("/dev", LVM_VG_NAME, LVM_LV_NAME)
+	defer sudo("lvremove", "-f", lvmLV)
+
+	sudo("mkfs.xfs", lvmLV)
+
+	err = os.MkdirAll(TMP_MOUNT_DIR, 0700)
+	if err == nil {
+		defer os.Remove(TMP_MOUNT_DIR)
+	} else {
+		t.Fatal(err)
+	}
+	sudo("mount", lvmLV, TMP_MOUNT_DIR)
+	defer sudo("umount", lvmLV)
+
+	sudo("chmod", "a+rwx", TMP_MOUNT_DIR)
+	err = ioutil.WriteFile(filepath.Join(TMP_MOUNT_DIR, "test"), []byte("OK"), 0666)
+	if err != nil {
+		t.Error("Can't write test file", err)
+	}
+
+	call(TMP_MOUNT_DIR, "--do")
+	if 100 != df(TMP_MOUNT_DIR) {
+		t.Error("Filesystem size", df(TMP_MOUNT_DIR))
+	}
+
+	needPartitions := []testPartition{
+		{2, MSDOS_START_BYTE, 5*GB - 1},
+		{1, 5 * GB, MSDOS_LAST_BYTE},
+	}
+	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
+	if partDiff != nil {
+		t.Error(partDiff)
+		pretty.Println(readPartitions(disk))
+	}
+
+	testBytes, err := ioutil.ReadFile(filepath.Join(TMP_MOUNT_DIR, "test"))
+	if err != nil {
+		t.Error("Can't read test file", err)
+	}
+	if string(testBytes) != "OK" {
+		t.Error("Bad file content:", string(testBytes))
+	}
+}
+
+func TestLVMPartitionInMiddleDiskGPT(t *testing.T) {
+	disk, err := createTmpDevice("gpt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer deleteTmpDevice(disk)
+
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(5*GB), s(6*GB))
+	sudo("parted", "-s", disk, "set", "1", "lvm", "on")
+
+	part := disk + "p1"
+	sudo("pvcreate", part)
+	sudo("vgcreate", LVM_VG_NAME, part)
+	defer sudo("vgremove", "-f", LVM_VG_NAME)
+	sudo("lvcreate", "-L", "500M", "-n", LVM_LV_NAME, LVM_VG_NAME)
+	lvmLV := filepath.Join("/dev", LVM_VG_NAME, LVM_LV_NAME)
+	defer sudo("lvremove", "-f", lvmLV)
+
+	sudo("mkfs.xfs", lvmLV)
+
+	err = os.MkdirAll(TMP_MOUNT_DIR, 0700)
+	if err == nil {
+		defer os.Remove(TMP_MOUNT_DIR)
+	} else {
+		t.Fatal(err)
+	}
+	sudo("mount", lvmLV, TMP_MOUNT_DIR)
+	defer sudo("umount", lvmLV)
+
+	sudo("chmod", "a+rwx", TMP_MOUNT_DIR)
+	err = ioutil.WriteFile(filepath.Join(TMP_MOUNT_DIR, "test"), []byte("OK"), 0666)
+	if err != nil {
+		t.Error("Can't write test file", err)
+	}
+
+	call(TMP_MOUNT_DIR, "--do")
+	if 100 != df(TMP_MOUNT_DIR) {
+		t.Error("Filesystem size", df(TMP_MOUNT_DIR))
+	}
+
+	needPartitions := []testPartition{
+		{2, GPT_START_BYTE, 5*GB - 1},
+		{1, 5 * GB, GPT_LAST_BYTE},
+	}
+	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
+	if partDiff != nil {
+		t.Error(partDiff)
+		pretty.Println(readPartitions(disk))
 	}
 
 	testBytes, err := ioutil.ReadFile(filepath.Join(TMP_MOUNT_DIR, "test"))
