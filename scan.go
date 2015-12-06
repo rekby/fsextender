@@ -120,6 +120,13 @@ func (p partition) IsFreeSpace() bool {
 	return p.Number == 0
 }
 func (p partition) makePath() string {
+	// Drive path ends with number, for example /dev/loop0
+	if len(p.Disk.Path) > 0 {
+		last := p.Disk.Path[len(p.Disk.Path)-1]
+		if last >= '0' && last <= '9' {
+			return p.Disk.Path + "p" + strconv.FormatUint(uint64(p.Number), 10)
+		}
+	}
 	return p.Disk.Path + strconv.FormatUint(uint64(p.Number), 10)
 }
 
@@ -390,7 +397,14 @@ func extractPartNumber(path string) (diskPath string, partNumber uint32, err err
 	for startPartNumber > 0 && unicode.IsDigit(runePath[startPartNumber-1]) {
 		startPartNumber--
 	}
-	diskPath = string(runePath[:startPartNumber])
+	diskPathRunes := runePath[:startPartNumber]
+
+	// If path have format /dev/loop0p1
+	if len(diskPathRunes) > 1 && diskPathRunes[len(diskPathRunes)-1] == 'p' && unicode.IsDigit(diskPathRunes[len(diskPathRunes)-2]) {
+		diskPathRunes = diskPathRunes[:len(diskPathRunes)-1]
+	}
+	diskPath = string(diskPathRunes)
+
 	partNumber64, _ := parseUint(string(runePath[startPartNumber:]))
 	return diskPath, uint32(partNumber64), nil
 }
