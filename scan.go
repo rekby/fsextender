@@ -661,6 +661,8 @@ func getTypeByMajorMinor(major, minor int) storageItemType {
 	}
 
 	switch major {
+	case 7:
+		return type_DISK
 	case 3, 22, 33, 34, 56, 57, 88, 89, 90, 91:
 		if minor%64 == 0 {
 			return type_DISK
