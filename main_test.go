@@ -115,53 +115,56 @@ func sudo(command string, args ...string) (res string, errString string, err err
 }
 
 func TestExt4Partition(t *testing.T) {
-	parttable := "msdos"
-	disk, err := createTmpDevice(parttable)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer deleteTmpDevice(disk)
+	for _, parttable := range PART_TABLES {
+		func() {
+			disk, err := createTmpDevice(parttable)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer deleteTmpDevice(disk)
 
-	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", "32256", "1073774080") // 1Gb
-	part := disk + "p1"
-	sudo("mkfs.ext4", part)
-	err = os.MkdirAll(TMP_MOUNT_DIR, 0700)
-	if err == nil {
-		defer os.Remove(TMP_MOUNT_DIR)
-	} else {
-		t.Fatal(err)
-	}
+			sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", "32256", "1073774080") // 1Gb
+			part := disk + "p1"
+			sudo("mkfs.ext4", part)
+			err = os.MkdirAll(TMP_MOUNT_DIR, 0700)
+			if err == nil {
+				defer os.Remove(TMP_MOUNT_DIR)
+			} else {
+				t.Fatal(parttable, err)
+			}
 
-	sudo("mount", part, TMP_MOUNT_DIR)
-	defer sudo("umount", part)
-	call(TMP_MOUNT_DIR, "--do")
-	res, _, _ := cmd("df", "-BG", part)
-	resLines := strings.Split(res, "\n")
-	blocksStart := strings.Index(resLines[0], "1G-blocks")
-	blocksEnd := blocksStart + len("1G-blocks")
-	blocksString := strings.TrimSpace(resLines[1][blocksStart:blocksEnd])
-	blocksString = strings.TrimSuffix(blocksString, "G")
-	blocks, _ := parseUint(blocksString)
-	if blocks != 99 {
-		t.Error(resLines[1])
-	}
+			sudo("mount", part, TMP_MOUNT_DIR)
+			defer sudo("umount", part)
+			call(TMP_MOUNT_DIR, "--do")
+			res, _, _ := cmd("df", "-BG", part)
+			resLines := strings.Split(res, "\n")
+			blocksStart := strings.Index(resLines[0], "1G-blocks")
+			blocksEnd := blocksStart + len("1G-blocks")
+			blocksString := strings.TrimSpace(resLines[1][blocksStart:blocksEnd])
+			blocksString = strings.TrimSuffix(blocksString, "G")
+			blocks, _ := parseUint(blocksString)
+			if blocks != 99 {
+				t.Error(parttable, resLines[1])
+			}
 
-	var needPartitions []testPartition
-	switch parttable {
-	case "gpt":
-		needPartitions = []testPartition{
-			{1, 32256, 107374165503},
-		}
-	case "msdos":
-		needPartitions = []testPartition{
-			{1, 32256, 107374182399},
-		}
-	default:
-		t.Fatal()
-	}
+			var needPartitions []testPartition
+			switch parttable {
+			case "gpt":
+				needPartitions = []testPartition{
+					{1, 32256, 107374165503},
+				}
+			case "msdos":
+				needPartitions = []testPartition{
+					{1, 32256, 107374182399},
+				}
+			default:
+				t.Fatal()
+			}
 
-	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
-	if partDiff != nil {
-		t.Error(partDiff)
+			partDiff := pretty.Diff(readPartitions(disk), needPartitions)
+			if partDiff != nil {
+				t.Error(parttable, partDiff)
+			}
+		}()
 	}
 }
