@@ -5,6 +5,7 @@ import (
 	"github.com/rekby/pretty"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -114,112 +115,215 @@ func sudo(command string, args ...string) (res string, errString string, err err
 	return cmd("sudo", args...)
 }
 
-func TestExt4Partition(t *testing.T) {
-	for _, parttable := range PART_TABLES {
-		func() {
-			disk, err := createTmpDevice(parttable)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer deleteTmpDevice(disk)
+func TestExt4PartitionMSDOS(t *testing.T) {
+	disk, err := createTmpDevice("msdos")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer deleteTmpDevice(disk)
 
-			sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", "32256", "1073774080") // 1Gb
-			part := disk + "p1"
-			sudo("mkfs.ext4", part)
-			err = os.MkdirAll(TMP_MOUNT_DIR, 0700)
-			if err == nil {
-				defer os.Remove(TMP_MOUNT_DIR)
-			} else {
-				t.Fatal(parttable, err)
-			}
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", "32256", "1073774080") // 1Gb
+	part := disk + "p1"
+	sudo("mkfs.ext4", part)
+	err = os.MkdirAll(TMP_MOUNT_DIR, 0700)
+	if err == nil {
+		defer os.Remove(TMP_MOUNT_DIR)
+	} else {
+		t.Fatal(err)
+	}
 
-			sudo("mount", part, TMP_MOUNT_DIR)
-			defer sudo("umount", part)
-			call(TMP_MOUNT_DIR, "--do")
-			res, _, _ := cmd("df", "-BG", part)
-			resLines := strings.Split(res, "\n")
-			blocksStart := strings.Index(resLines[0], "1G-blocks")
-			blocksEnd := blocksStart + len("1G-blocks")
-			blocksString := strings.TrimSpace(resLines[1][blocksStart:blocksEnd])
-			blocksString = strings.TrimSuffix(blocksString, "G")
-			blocks, _ := parseUint(blocksString)
-			if blocks != 99 {
-				t.Error(parttable, resLines[1])
-			}
+	sudo("mount", part, TMP_MOUNT_DIR)
+	defer sudo("umount", part)
+	sudo("chmod", "a+rwx", TMP_MOUNT_DIR)
+	err = ioutil.WriteFile(filepath.Join(TMP_MOUNT_DIR, "test"), []byte("OK"), 0666)
+	if err != nil {
+		t.Error("Can't write test file", err)
+	}
+	call(TMP_MOUNT_DIR, "--do")
+	res, _, _ := cmd("df", "-BG", part)
+	resLines := strings.Split(res, "\n")
+	blocksStart := strings.Index(resLines[0], "1G-blocks")
+	blocksEnd := blocksStart + len("1G-blocks")
+	blocksString := strings.TrimSpace(resLines[1][blocksStart:blocksEnd])
+	blocksString = strings.TrimSuffix(blocksString, "G")
+	blocks, _ := parseUint(blocksString)
+	if blocks != 99 {
+		t.Error(resLines[1])
+	}
 
-			var needPartitions []testPartition
-			switch parttable {
-			case "gpt":
-				needPartitions = []testPartition{
-					{1, 32256, 107374165503},
-				}
-			case "msdos":
-				needPartitions = []testPartition{
-					{1, 32256, 107374182399},
-				}
-			default:
-				t.Fatal()
-			}
+	needPartitions := []testPartition{
+		{1, 32256, 107374182399},
+	}
 
-			partDiff := pretty.Diff(readPartitions(disk), needPartitions)
-			if partDiff != nil {
-				t.Error(parttable, partDiff)
-			}
-		}()
+	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
+	if partDiff != nil {
+		t.Error(partDiff)
+	}
+
+	testBytes, err := ioutil.ReadFile(filepath.Join(TMP_MOUNT_DIR, "test"))
+	if err != nil {
+		t.Error("Can't read test file", err)
+	}
+	if string(testBytes) != "OK" {
+		t.Error("Bad file content:", string(testBytes))
 	}
 }
 
-func TestXfsPartition(t *testing.T) {
-	for _, parttable := range PART_TABLES {
-		func() {
-			disk, err := createTmpDevice(parttable)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer deleteTmpDevice(disk)
+func TestExt4PartitionGPT(t *testing.T) {
+	disk, err := createTmpDevice("gpt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer deleteTmpDevice(disk)
 
-			sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", "32256", "1073774080") // 1Gb
-			part := disk + "p1"
-			sudo("mkfs.xfs", part)
-			err = os.MkdirAll(TMP_MOUNT_DIR, 0700)
-			if err == nil {
-				defer os.Remove(TMP_MOUNT_DIR)
-			} else {
-				t.Fatal(parttable, err)
-			}
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", "32256", "1073774080") // 1Gb
+	part := disk + "p1"
+	sudo("mkfs.ext4", part)
+	err = os.MkdirAll(TMP_MOUNT_DIR, 0700)
+	if err == nil {
+		defer os.Remove(TMP_MOUNT_DIR)
+	} else {
+		t.Fatal(err)
+	}
 
-			sudo("mount", part, TMP_MOUNT_DIR)
-			defer sudo("umount", part)
-			call(TMP_MOUNT_DIR, "--do")
-			res, _, _ := cmd("df", "-BG", part)
-			resLines := strings.Split(res, "\n")
-			blocksStart := strings.Index(resLines[0], "1G-blocks")
-			blocksEnd := blocksStart + len("1G-blocks")
-			blocksString := strings.TrimSpace(resLines[1][blocksStart:blocksEnd])
-			blocksString = strings.TrimSuffix(blocksString, "G")
-			blocks, _ := parseUint(blocksString)
-			if blocks != 100 {
-				t.Error(parttable, resLines[1])
-			}
+	sudo("mount", part, TMP_MOUNT_DIR)
+	defer sudo("umount", part)
+	sudo("chmod", "a+rwx", TMP_MOUNT_DIR)
+	err = ioutil.WriteFile(filepath.Join(TMP_MOUNT_DIR, "test"), []byte("OK"), 0666)
+	if err != nil {
+		t.Error("Can't write test file", err)
+	}
+	call(TMP_MOUNT_DIR, "--do")
+	res, _, _ := cmd("df", "-BG", part)
+	resLines := strings.Split(res, "\n")
+	blocksStart := strings.Index(resLines[0], "1G-blocks")
+	blocksEnd := blocksStart + len("1G-blocks")
+	blocksString := strings.TrimSpace(resLines[1][blocksStart:blocksEnd])
+	blocksString = strings.TrimSuffix(blocksString, "G")
+	blocks, _ := parseUint(blocksString)
+	if blocks != 99 {
+		t.Error(resLines[1])
+	}
 
-			var needPartitions []testPartition
-			switch parttable {
-			case "gpt":
-				needPartitions = []testPartition{
-					{1, 32256, 107374165503},
-				}
-			case "msdos":
-				needPartitions = []testPartition{
-					{1, 32256, 107374182399},
-				}
-			default:
-				t.Fatal()
-			}
+	needPartitions := []testPartition{
+		{1, 32256, 107374165503},
+	}
+	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
+	if partDiff != nil {
+		t.Error(partDiff)
+	}
 
-			partDiff := pretty.Diff(readPartitions(disk), needPartitions)
-			if partDiff != nil {
-				t.Error(parttable, partDiff)
-			}
-		}()
+	testBytes, err := ioutil.ReadFile(filepath.Join(TMP_MOUNT_DIR, "test"))
+	if err != nil {
+		t.Error("Can't read test file", err)
+	}
+	if string(testBytes) != "OK" {
+		t.Error("Bad file content:", string(testBytes))
+	}
+
+}
+
+func TestXfsPartitionMSDOS(t *testing.T) {
+	disk, err := createTmpDevice("msdos")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer deleteTmpDevice(disk)
+
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", "32256", "1073774080") // 1Gb
+	part := disk + "p1"
+	sudo("mkfs.xfs", part)
+	err = os.MkdirAll(TMP_MOUNT_DIR, 0700)
+	if err == nil {
+		defer os.Remove(TMP_MOUNT_DIR)
+	} else {
+		t.Fatal(err)
+	}
+
+	sudo("mount", part, TMP_MOUNT_DIR)
+	defer sudo("umount", part)
+	sudo("chmod", "a+rwx", TMP_MOUNT_DIR)
+	err = ioutil.WriteFile(filepath.Join(TMP_MOUNT_DIR, "test"), []byte("OK"), 0666)
+	if err != nil {
+		t.Error("Can't write test file", err)
+	}
+	call(TMP_MOUNT_DIR, "--do")
+	res, _, _ := cmd("df", "-BG", part)
+	resLines := strings.Split(res, "\n")
+	blocksStart := strings.Index(resLines[0], "1G-blocks")
+	blocksEnd := blocksStart + len("1G-blocks")
+	blocksString := strings.TrimSpace(resLines[1][blocksStart:blocksEnd])
+	blocksString = strings.TrimSuffix(blocksString, "G")
+	blocks, _ := parseUint(blocksString)
+	if blocks != 100 {
+		t.Error(resLines[1])
+	}
+
+	needPartitions := []testPartition{
+		{1, 32256, 107374182399},
+	}
+	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
+	if partDiff != nil {
+		t.Error(partDiff)
+	}
+	testBytes, err := ioutil.ReadFile(filepath.Join(TMP_MOUNT_DIR, "test"))
+	if err != nil {
+		t.Error("Can't read test file", err)
+	}
+	if string(testBytes) != "OK" {
+		t.Error("Bad file content:", string(testBytes))
+	}
+}
+
+func TestXfsPartitionGPT(t *testing.T) {
+	disk, err := createTmpDevice("gpt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer deleteTmpDevice(disk)
+
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", "32256", "1073774080") // 1Gb
+	part := disk + "p1"
+	sudo("mkfs.xfs", part)
+	err = os.MkdirAll(TMP_MOUNT_DIR, 0700)
+	if err == nil {
+		defer os.Remove(TMP_MOUNT_DIR)
+	} else {
+		t.Fatal(err)
+	}
+
+	sudo("mount", part, TMP_MOUNT_DIR)
+	defer sudo("umount", part)
+	sudo("chmod", "a+rwx", TMP_MOUNT_DIR)
+	err = ioutil.WriteFile(filepath.Join(TMP_MOUNT_DIR, "test"), []byte("OK"), 0666)
+	if err != nil {
+		t.Error("Can't write test file", err)
+	}
+	call(TMP_MOUNT_DIR, "--do")
+	res, _, _ := cmd("df", "-BG", part)
+	resLines := strings.Split(res, "\n")
+	blocksStart := strings.Index(resLines[0], "1G-blocks")
+	blocksEnd := blocksStart + len("1G-blocks")
+	blocksString := strings.TrimSpace(resLines[1][blocksStart:blocksEnd])
+	blocksString = strings.TrimSuffix(blocksString, "G")
+	blocks, _ := parseUint(blocksString)
+	if blocks != 100 {
+		t.Error(resLines[1])
+	}
+
+	needPartitions := []testPartition{
+		{1, 32256, 107374165503},
+	}
+
+	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
+	if partDiff != nil {
+		t.Error(partDiff)
+	}
+	testBytes, err := ioutil.ReadFile(filepath.Join(TMP_MOUNT_DIR, "test"))
+	if err != nil {
+		t.Error("Can't read test file", err)
+	}
+	if string(testBytes) != "OK" {
+		t.Error("Bad file content:", string(testBytes))
 	}
 }
