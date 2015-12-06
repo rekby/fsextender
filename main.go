@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+const DEBUG = true
+
 func main() {
 	if len(os.Args) < 2 || os.Args[1][0] != '/' {
 		printUsage()
@@ -55,8 +57,10 @@ func cmd(cmd string, args ...string) (stdout, errout string, err error) {
 	command.Stdout = bufStd
 	command.Stderr = bufErr
 	err = command.Run()
-	log.Printf("CMD: '%v' '%v'\n", cmd, strings.Join(args, "' '"))
-	log.Printf("RES: %v\nERR: %v\nERROR: %v\n", bufStd.String(), bufErr.String(), err)
+	if DEBUG {
+		log.Printf("CMD: '%v' '%v'\n", cmd, strings.Join(args, "' '"))
+		log.Printf("RES:\n%v\nERR:\n%v\nERROR:\n%v\n\n", bufStd.String(), bufErr.String(), err)
+	}
 	return bufStd.String(), bufErr.String(), err
 }
 
