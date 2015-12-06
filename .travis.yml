@@ -3,7 +3,7 @@ dist: trusty
 
 before_script:
     - sudo apt-get update
-    - sudo apt-get install -y xfsprogs
+    - sudo apt-get install -y xfsprogs lvm2
     - go get github.com/rekby/fsextender
     - go install github.com/rekby/fsextender
     - cp $GOPATH/bin/fsextender $HOME/gopath/src/github.com/rekby/fsextender

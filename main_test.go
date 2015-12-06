@@ -14,6 +14,8 @@ import (
 const GB = 1024 * 1024 * 1024
 const TMP_DIR = "/tmp"
 const TMP_MOUNT_DIR = "/tmp/fsextender-test-mount-dir"
+const LVM_VG_NAME = "test-fsextender-lvm-vg"
+const LVM_LV_NAME = "test-fsextender-lvm-lv"
 
 var PART_TABLES = []string{"msdos", "gpt"}
 
@@ -73,6 +75,18 @@ func deleteTmpDevice(path string) {
 
 	cmd("sudo", "losetup", "-d", path)
 	os.Remove(filePath)
+}
+
+// Return volume of filesystem in 1-Gb blocks
+func df(path string) uint64 {
+	res, _, _ := cmd("df", "-BG", path)
+	resLines := strings.Split(res, "\n")
+	blocksStart := strings.Index(resLines[0], "1G-blocks")
+	blocksEnd := blocksStart + len("1G-blocks")
+	blocksString := strings.TrimSpace(resLines[1][blocksStart:blocksEnd])
+	blocksString = strings.TrimSuffix(blocksString, "G")
+	blocks, _ := parseUint(blocksString)
+	return blocks
 }
 
 func readPartitions(path string) (res []testPartition) {
@@ -319,6 +333,120 @@ func TestXfsPartitionGPT(t *testing.T) {
 	if partDiff != nil {
 		t.Error(partDiff)
 	}
+	testBytes, err := ioutil.ReadFile(filepath.Join(TMP_MOUNT_DIR, "test"))
+	if err != nil {
+		t.Error("Can't read test file", err)
+	}
+	if string(testBytes) != "OK" {
+		t.Error("Bad file content:", string(testBytes))
+	}
+}
+
+func TestLVMPartitionMSDOS(t *testing.T) {
+	disk, err := createTmpDevice("msdos")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer deleteTmpDevice(disk)
+
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", "32256", "1073774080") // 1Gb
+	sudo("parted", "-s", disk, "set", "1", "lvm", "on")
+
+	part := disk + "p1"
+	sudo("pvcreate", part)
+	sudo("vgcreate", LVM_VG_NAME, part)
+	defer sudo("vgremove", "-f", LVM_VG_NAME)
+	sudo("lvcreate", "-L", "500M", "-n", LVM_LV_NAME, LVM_VG_NAME)
+	lvmLV := filepath.Join("/dev", LVM_VG_NAME, LVM_LV_NAME)
+	defer sudo("lvremove", "-f", lvmLV)
+
+	sudo("mkfs.xfs", lvmLV)
+
+	err = os.MkdirAll(TMP_MOUNT_DIR, 0700)
+	if err == nil {
+		defer os.Remove(TMP_MOUNT_DIR)
+	} else {
+		t.Fatal(err)
+	}
+	sudo("mount", lvmLV, TMP_MOUNT_DIR)
+	defer sudo("umount", lvmLV)
+
+	sudo("chmod", "a+rwx", TMP_MOUNT_DIR)
+	err = ioutil.WriteFile(filepath.Join(TMP_MOUNT_DIR, "test"), []byte("OK"), 0666)
+	if err != nil {
+		t.Error("Can't write test file", err)
+	}
+
+	call(TMP_MOUNT_DIR, "--do")
+	if 100 != df(TMP_MOUNT_DIR) {
+		t.Error("Filesystem size")
+	}
+
+	needPartitions := []testPartition{
+		{1, 32256, 107374182399},
+	}
+	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
+	if partDiff != nil {
+		t.Error(partDiff)
+	}
+
+	testBytes, err := ioutil.ReadFile(filepath.Join(TMP_MOUNT_DIR, "test"))
+	if err != nil {
+		t.Error("Can't read test file", err)
+	}
+	if string(testBytes) != "OK" {
+		t.Error("Bad file content:", string(testBytes))
+	}
+}
+
+func TestLVMPartitionGPT(t *testing.T) {
+	disk, err := createTmpDevice("gpt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer deleteTmpDevice(disk)
+
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", "32256", "1073774080") // 1Gb
+	sudo("parted", "-s", disk, "set", "1", "lvm", "on")
+
+	part := disk + "p1"
+	sudo("pvcreate", part)
+	sudo("vgcreate", LVM_VG_NAME, part)
+	defer sudo("vgremove", "-f", LVM_VG_NAME)
+	sudo("lvcreate", "-L", "500M", "-n", LVM_LV_NAME, LVM_VG_NAME)
+	lvmLV := filepath.Join("/dev", LVM_VG_NAME, LVM_LV_NAME)
+	defer sudo("lvremove", "-f", lvmLV)
+
+	sudo("mkfs.xfs", lvmLV)
+
+	err = os.MkdirAll(TMP_MOUNT_DIR, 0700)
+	if err == nil {
+		defer os.Remove(TMP_MOUNT_DIR)
+	} else {
+		t.Fatal(err)
+	}
+	sudo("mount", lvmLV, TMP_MOUNT_DIR)
+	defer sudo("umount", lvmLV)
+
+	sudo("chmod", "a+rwx", TMP_MOUNT_DIR)
+	err = ioutil.WriteFile(filepath.Join(TMP_MOUNT_DIR, "test"), []byte("OK"), 0666)
+	if err != nil {
+		t.Error("Can't write test file", err)
+	}
+
+	call(TMP_MOUNT_DIR, "--do")
+	if 100 != df(TMP_MOUNT_DIR) {
+		t.Error("Filesystem size")
+	}
+
+	needPartitions := []testPartition{
+		{1, 32256, 107374165503},
+	}
+	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
+	if partDiff != nil {
+		t.Error(partDiff)
+	}
+
 	testBytes, err := ioutil.ReadFile(filepath.Join(TMP_MOUNT_DIR, "test"))
 	if err != nil {
 		t.Error("Can't read test file", err)
