@@ -2,6 +2,7 @@ sudo: required
 dist: trusty
 
 before_script:
+    - sudo apt-get update
     - sudo apt-get install -y xfsprogs
     - go get github.com/rekby/fsextender
     - go install github.com/rekby/fsextender
