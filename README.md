@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.org/rekby/fsextender.svg)](https://travis-ci.org/rekby/fsextender)
+[![Coverage Status](https://coveralls.io/repos/rekby/fsextender/badge.svg?branch=travis-ci&service=github)](https://coveralls.io/github/rekby/fsextender?branch=travis-ci)
 
 Extend filesystem to max size.
 
