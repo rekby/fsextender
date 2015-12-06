@@ -1,5 +1,6 @@
 [![Build Status](https://travis-ci.org/rekby/fsextender.svg)](https://travis-ci.org/rekby/fsextender)
 [![Coverage Status](https://coveralls.io/repos/rekby/fsextender/badge.svg?branch=master&service=github)](https://coveralls.io/github/rekby/fsextender?branch=master)
+
 Extend filesystem to max size.
 
 If filesystem lie on LVM-volume - extend lvm volume and lvm volume group to max size too (extend partitions, create new
