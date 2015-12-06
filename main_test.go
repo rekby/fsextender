@@ -33,7 +33,20 @@ type testPartition struct {
 
 // Call main program
 func call(args ...string) {
-	sudo("./fsextender", args...)
+	if os.Getuid() == 0 {
+		// for test coverage run test as root
+		oldArgs := os.Args
+		os.Args = append([]string{os.Args[0]}, args...)
+
+		// Clean old environment
+		majorMinorDeviceTypeCache = make(map[[2]int]storageItem)
+		diskNewPartitionNumLastGeneratedNum = make(map[[2]int]uint32)
+
+		main()
+		os.Args = oldArgs
+	} else {
+		sudo("./fsextender", args...)
+	}
 }
 
 // Create loop-back test device with partition table
