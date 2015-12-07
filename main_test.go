@@ -46,7 +46,7 @@ func call(args ...string) {
 		// Clean old environment
 		resetProgramState()
 
-		main()
+		Main()
 		os.Args = oldArgs
 	} else {
 		sudo("./fsextender", args...)

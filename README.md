@@ -9,11 +9,12 @@ partitions and etc).
 Usage example:
 fsextender /home [--do]
 
---do - do modify partitions. Without --do - print extend plan only.
+--do - do modify partitions (without print plan).
+Without --do - print plan.
 
-it write to stdout:
-OK - if extended compele.
-NEED REBOOT AND START ME ONCE AGAIN. - if need reboot and run command with same parameters
+Detect result:
+OK - if extended compele. Return code 0.
+NEED REBOOT AND START ME ONCE AGAIN. - if need reboot and run command with same parameters. Return code 1.
 
 external dependencies:
 /proc/mounts - detect mount points

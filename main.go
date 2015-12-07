@@ -12,9 +12,13 @@ import (
 const DEBUG = false
 
 func main() {
+	os.Exit(Main())
+}
+
+func Main() int {
 	if len(os.Args) < 2 || os.Args[1][0] != '/' {
 		printUsage()
-		return
+		return -1
 	}
 
 	startPoint := os.Args[1]
@@ -28,14 +32,18 @@ func main() {
 		panic(err)
 	}
 	plan := extendPlan(storage)
-	extendPrint(plan)
 
 	if len(os.Args) > 2 && os.Args[2] == "--do" {
 		if extendDo(plan) {
 			fmt.Println("NEED REBOOT AND START ME ONCE AGAIN.")
+			return 1
 		} else {
 			fmt.Println("OK")
+			return 0
 		}
+	} else {
+		extendPrint(plan)
+		return 0
 	}
 }
 
