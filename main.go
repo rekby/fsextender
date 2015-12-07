@@ -18,7 +18,7 @@ func main() {
 func Main() int {
 	if len(os.Args) < 2 || os.Args[1][0] != '/' {
 		printUsage()
-		return 128
+		return 1
 	}
 
 	startPoint := os.Args[1]
@@ -36,7 +36,7 @@ func Main() int {
 	if len(os.Args) > 2 && os.Args[2] == "--do" {
 		if extendDo(plan) {
 			fmt.Println("NEED REBOOT AND START ME ONCE AGAIN.")
-			return 1
+			return 128
 		} else {
 			fmt.Println("OK")
 			return 0

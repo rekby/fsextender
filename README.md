@@ -14,9 +14,9 @@ Without --do - print plan.
 
 Detect result:
 OK - if extended compele. Return code 0.
-NEED REBOOT AND START ME ONCE AGAIN. - if need reboot and run command with same parameters. Return code 1.
+NEED REBOOT AND START ME ONCE AGAIN. - if need reboot and run command with same parameters. Return code 128.
 
-Code > 127 mean error exit. (Now it print usages only).
+0 < Code < 128 mean error exit. (Now it print usages and panic only).
 
 external dependencies:
 /proc/mounts - detect mount points
