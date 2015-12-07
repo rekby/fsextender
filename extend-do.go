@@ -329,6 +329,18 @@ func extendDo(plan []storageItem) (needReboot bool) {
 				item.Size = newSize
 				break retryLoop
 			}
+		case type_LVM_PV_ADD:
+			vg := plan[item.Child].Path
+			oldSize, _, _ := lvmVGGetSize(vg)
+			for retry := 0; retry < TRY_COUNT; retry++ {
+				cmd("vgextend", vg, item.Path)
+				newSize, _, _ := lvmVGGetSize(vg)
+				if newSize > oldSize {
+					fmt.Printf("Add free pv (%v) to vg(%v), new size: %v(+%v)\n", item.Path, vg,
+						formatSize(newSize), formatSize(newSize-oldSize))
+					break
+				}
+			}
 		case type_LVM_PV_NEW:
 			vg := plan[item.Child].Path
 			oldSize, _, _ := lvmVGGetSize(vg)
