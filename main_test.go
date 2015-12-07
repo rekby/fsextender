@@ -31,6 +31,11 @@ type testPartition struct {
 	Last   uint64
 }
 
+func resetProgramState(){
+	majorMinorDeviceTypeCache = make(map[[2]int]storageItem)
+	diskNewPartitionNumLastGeneratedNum = make(map[[2]int]uint32)
+}
+
 // Call main program
 func call(args ...string) {
 	if os.Getuid() == 0 {
@@ -39,8 +44,7 @@ func call(args ...string) {
 		os.Args = append([]string{os.Args[0]}, args...)
 
 		// Clean old environment
-		majorMinorDeviceTypeCache = make(map[[2]int]storageItem)
-		diskNewPartitionNumLastGeneratedNum = make(map[[2]int]uint32)
+		resetProgramState()
 
 		main()
 		os.Args = oldArgs
@@ -842,5 +846,39 @@ func TestLVMPartitionIn2MiddleDiskGPT(t *testing.T) {
 	}
 	if string(testBytes) != "OK" {
 		t.Error("Bad file content:", string(testBytes))
+	}
+}
+
+func TestRecursiveHierarchy(t *testing.T){
+	disk, err := createTmpDevice("msdos")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer deleteTmpDevice(disk)
+
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(MSDOS_START_BYTE), s(MSDOS_LAST_BYTE))
+
+	part := disk + "p1"
+	sudo("pvcreate", part)
+	sudo("vgcreate", LVM_VG_NAME, part)
+	defer sudo("vgremove", "-f", LVM_VG_NAME)
+	sudo("lvcreate", "-L", "500M", "-n", LVM_LV_NAME, LVM_VG_NAME)
+	lvmLV := filepath.Join("/dev", LVM_VG_NAME, LVM_LV_NAME)
+	defer sudo("lvremove", "-f", lvmLV)
+
+	// Create pv in LVM
+	sudo("pvcreate", lvmLV)
+	defer sudo("lvremove", lvmLV)
+
+	// Extend VG to PV in the VM - create recursive dependency
+	sudo("vgextend", LVM_VG_NAME, lvmLV)
+	defer sudo("vgreduce", LVM_VG_NAME, lvmLV)
+
+	resetProgramState()
+	_, err = extendScanWays(lvmLV)
+	if err == nil {
+		t.Error("MUST detect hierarchy recursive error")
+	} else {
+		t.Log("Recursive error OK detected as:", err)
 	}
 }
