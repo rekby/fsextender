@@ -298,7 +298,7 @@ func extendDo(plan []storageItem) (needReboot bool) {
 				cmd("lvresize", "-l", "+100%FREE", item.Path)
 				newSize := lvmLVGetSize(item.Path)
 				addSpace := newSize - item.Size
-				if plan[item.Child].FreeSpace > 0 && (addSpace == 0 || newSize == 0) {
+				if item.FreeSpace > 0 && (addSpace == 0 || newSize == 0) {
 					continue retryLoop2
 				}
 				log.Printf("Resize LVM_LV %v to %v(+%v)\n", item.Path, formatSize(newSize), formatSize(addSpace))
