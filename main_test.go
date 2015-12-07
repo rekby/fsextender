@@ -98,6 +98,7 @@ func deleteTmpDevice(path string) {
 
 	cmd("sudo", "losetup", "-d", path)
 	os.Remove(filePath)
+	time.Sleep(time.Second) // time to kernel remove device
 }
 
 // Return volume of filesystem in 1-Gb blocks
@@ -439,6 +440,7 @@ func TestLVMPartitionMSDOS(t *testing.T) {
 
 	part := disk + "p1"
 	sudo("pvcreate", part)
+	defer sudo("pvremove", part)
 	sudo("vgcreate", LVM_VG_NAME, part)
 	defer sudo("vgremove", "-f", LVM_VG_NAME)
 	sudo("lvcreate", "-L", "500M", "-n", LVM_LV_NAME, LVM_VG_NAME)
@@ -496,6 +498,7 @@ func TestLVMPartitionGPT(t *testing.T) {
 
 	part := disk + "p1"
 	sudo("pvcreate", part)
+	defer sudo("pvremove", part)
 	sudo("vgcreate", LVM_VG_NAME, part)
 	defer sudo("vgremove", "-f", LVM_VG_NAME)
 	sudo("lvcreate", "-L", "500M", "-n", LVM_LV_NAME, LVM_VG_NAME)
@@ -554,7 +557,9 @@ func TestLVMPartitionADD_PV(t *testing.T) {
 
 	part := disk + "p1"
 	sudo("pvcreate", part)
+	defer sudo("pvremove", part)
 	sudo("pvcreate", disk+"p2") // create free pv
+	defer sudo("pvremove", disk+"p2")
 	sudo("vgcreate", LVM_VG_NAME, part)
 	defer sudo("vgremove", "-f", LVM_VG_NAME)
 	sudo("lvcreate", "-L", "500M", "-n", LVM_LV_NAME, LVM_VG_NAME)
@@ -601,7 +606,7 @@ func TestLVMPartitionADD_PV(t *testing.T) {
 	}
 }
 
-func TestLVMPartition_ResivePV(t *testing.T) {
+func TestLVMPartition_ResizePV(t *testing.T) {
 	disk, err := createTmpDevice("msdos")
 	if err != nil {
 		t.Fatal(err)
@@ -646,7 +651,7 @@ func TestLVMPartition_ResivePV(t *testing.T) {
 
 	call(TMP_MOUNT_DIR, "--do")
 	if 100 != df(TMP_MOUNT_DIR) {
-		t.Error("Filesystem size")
+		t.Error("Filesystem size", df(TMP_MOUNT_DIR))
 	}
 
 	needPartitions := []testPartition{
@@ -678,6 +683,7 @@ func TestLVMPartitionInMiddleDiskMSDOS(t *testing.T) {
 
 	part := disk + "p1"
 	sudo("pvcreate", part)
+	defer sudo("pvremove", part)
 	sudo("vgcreate", LVM_VG_NAME, part)
 	defer sudo("vgremove", "-f", LVM_VG_NAME)
 	sudo("lvcreate", "-L", "500M", "-n", LVM_LV_NAME, LVM_VG_NAME)
@@ -710,6 +716,7 @@ func TestLVMPartitionInMiddleDiskMSDOS(t *testing.T) {
 		{2, MSDOS_START_BYTE, 5*GB - 1},
 		{1, 5 * GB, MSDOS_LAST_BYTE},
 	}
+
 	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
 	if partDiff != nil {
 		t.Error(partDiff)
@@ -737,6 +744,8 @@ func TestLVMPartitionInMiddleDiskGPT(t *testing.T) {
 
 	part := disk + "p1"
 	sudo("pvcreate", part)
+	defer sudo("pvremove", part)
+
 	sudo("vgcreate", LVM_VG_NAME, part)
 	defer sudo("vgremove", "-f", LVM_VG_NAME)
 	sudo("lvcreate", "-L", "500M", "-n", LVM_LV_NAME, LVM_VG_NAME)
@@ -799,6 +808,8 @@ func TestLVMPartitionIn2MiddleDiskMSDOS(t *testing.T) {
 
 	part := disk + "p1"
 	sudo("pvcreate", part)
+	defer sudo("pvremove", part)
+
 	sudo("vgcreate", LVM_VG_NAME, part)
 	defer sudo("vgremove", "-f", LVM_VG_NAME)
 	sudo("lvcreate", "-L", "500M", "-n", LVM_LV_NAME, LVM_VG_NAME)
@@ -863,6 +874,7 @@ func TestLVMPartitionIn2MiddleDiskGPT(t *testing.T) {
 
 	part := disk + "p1"
 	sudo("pvcreate", part)
+	defer sudo("pvremove", part)
 	sudo("vgcreate", LVM_VG_NAME, part)
 	defer sudo("vgremove", "-f", LVM_VG_NAME)
 	sudo("lvcreate", "-L", "500M", "-n", LVM_LV_NAME, LVM_VG_NAME)
@@ -923,6 +935,7 @@ func TestRecursiveHierarchy(t *testing.T) {
 
 	part := disk + "p1"
 	sudo("pvcreate", part)
+	defer sudo("pvremove", part)
 	sudo("vgcreate", LVM_VG_NAME, part)
 	defer sudo("vgremove", "-f", LVM_VG_NAME)
 	sudo("lvcreate", "-L", "500M", "-n", LVM_LV_NAME, LVM_VG_NAME)
