@@ -148,8 +148,12 @@ func s(n uint64) string {
 }
 
 func sudo(command string, args ...string) (res string, errString string, err error) {
-	args = append([]string{command}, args...)
-	return cmd("sudo", args...)
+	if os.Getuid() == 0 {
+		return cmd(command, args...)
+	} else {
+		args = append([]string{command}, args...)
+		return cmd("sudo", args...)
+	}
 }
 
 func TestExt4PartitionMSDOS(t *testing.T) {
