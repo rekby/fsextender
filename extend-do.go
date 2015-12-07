@@ -90,7 +90,7 @@ func extendDo(plan []storageItem) (needReboot bool) {
 					item.Size += item.FreeSpace
 					item.FreeSpace = 0
 				}
-				fmt.Printf("Partition resized: %v to %v (+%v)\n", item.Path, formatSize(item.Size), formatSize(oldFreeSpace))
+				log.Printf("Partition resized: %v to %v (+%v)\n", item.Path, formatSize(item.Size), formatSize(oldFreeSpace))
 			case "gpt":
 				diskIO, err := os.OpenFile(item.Partition.Disk.Path, os.O_RDWR|os.O_SYNC, 0)
 				defer diskIO.Close() // Have to be closed manually. Defer close - for protect only.
@@ -147,7 +147,7 @@ func extendDo(plan []storageItem) (needReboot bool) {
 					item.Size += item.FreeSpace
 					item.FreeSpace = 0
 				}
-				fmt.Printf("Partition resized: %v to %v (+%v)\n", item.Path, formatSize(item.Size), formatSize(oldFreeSpace))
+				log.Printf("Partition resized: %v to %v (+%v)\n", item.Path, formatSize(item.Size), formatSize(oldFreeSpace))
 			default:
 				log.Printf("I don't know partition table: %v(%v)", item.Partition.Disk.PartTable, item.Path)
 				continue
@@ -225,7 +225,7 @@ func extendDo(plan []storageItem) (needReboot bool) {
 				}
 				diskIO.Close()
 				cmd("partprobe", item.Partition.Disk.Path)
-				fmt.Printf("Partition created: %v (%v)\n", item.Path, formatSize(lbaLen*item.Partition.Disk.SectorSizeLogical))
+				log.Printf("Partition created: %v (%v)\n", item.Path, formatSize(lbaLen*item.Partition.Disk.SectorSizeLogical))
 			case "gpt":
 				diskIO, err := os.OpenFile(item.Partition.Disk.Path, os.O_RDWR, 0)
 				if err != nil {
@@ -278,7 +278,7 @@ func extendDo(plan []storageItem) (needReboot bool) {
 					continue
 				}
 				cmd("partprobe", item.Partition.Disk.Path)
-				fmt.Printf("New GPT partition created: %v (%v)\n", item.Path, formatSize((part.LastLBA-part.FirstLBA+1)*item.Partition.Disk.SectorSizeLogical))
+				log.Printf("New GPT partition created: %v (%v)\n", item.Path, formatSize((part.LastLBA-part.FirstLBA+1)*item.Partition.Disk.SectorSizeLogical))
 			default:
 				log.Println("Can't create partition in unknown partition table: ", item.Partition.Path, item.Partition.Disk.PartTable)
 			}
@@ -287,7 +287,7 @@ func extendDo(plan []storageItem) (needReboot bool) {
 			if item.Child != -1 {
 				plan[item.Child].FreeSpace = item.FreeSpace
 			}
-			fmt.Printf("Free space on LVM_GROUP '%v' %v\n", item.Path, formatSize(item.FreeSpace))
+			log.Printf("Free space on LVM_GROUP '%v' %v\n", item.Path, formatSize(item.FreeSpace))
 		case type_LVM_LV:
 		retryLoop2:
 			for retry := 0; retry < TRY_COUNT; retry++ {
@@ -301,7 +301,7 @@ func extendDo(plan []storageItem) (needReboot bool) {
 				if plan[item.Child].FreeSpace > 0 && (addSpace == 0 || newSize == 0) {
 					continue retryLoop2
 				}
-				fmt.Printf("Resize LVM_LV %v to %v(+%v)\n", item.Path, formatSize(newSize), formatSize(addSpace))
+				log.Printf("Resize LVM_LV %v to %v(+%v)\n", item.Path, formatSize(newSize), formatSize(addSpace))
 				item.Size = newSize
 				item.FreeSpace = 0
 				if item.Child != -1 {
@@ -324,7 +324,7 @@ func extendDo(plan []storageItem) (needReboot bool) {
 				if item.Child != -1 {
 					plan[item.Child].FreeSpace += addSpace
 				}
-				fmt.Printf("LVM PV Resized: %v to %v (+%v)\n", item.Path, formatSize(newSize), formatSize(addSpace))
+				log.Printf("LVM PV Resized: %v to %v (+%v)\n", item.Path, formatSize(newSize), formatSize(addSpace))
 				item.FreeSpace -= addSpace
 				item.Size = newSize
 				break retryLoop
@@ -336,7 +336,7 @@ func extendDo(plan []storageItem) (needReboot bool) {
 				cmd("vgextend", vg, item.Path)
 				newSize, _, _ := lvmVGGetSize(vg)
 				if newSize > oldSize {
-					fmt.Printf("Add free pv (%v) to vg(%v), new size: %v(+%v)\n", item.Path, vg,
+					log.Printf("Add free pv (%v) to vg(%v), new size: %v(+%v)\n", item.Path, vg,
 						formatSize(newSize), formatSize(newSize-oldSize))
 					break
 				}
@@ -351,11 +351,11 @@ func extendDo(plan []storageItem) (needReboot bool) {
 				newSize, _, _ := lvmVGGetSize(vg) // Yes - create LVM PV, but check size of LVM VG. It is OK.
 				addSpace := newSize - oldSize
 				if plan[item.Child].FreeSpace > 0 && (addSpace == 0 || newSize == 0) {
-					fmt.Println("Try extend VG once more: ", vg, item.Path)
+					log.Println("Try extend VG once more: ", vg, item.Path)
 					time.Sleep(time.Second)
 					continue retryLoop3
 				} else {
-					fmt.Printf("Add PV %v (+%v)\n", item.Path, formatSize(newSize-oldSize))
+					log.Printf("Add PV %v (+%v)\n", item.Path, formatSize(newSize-oldSize))
 					break retryLoop3
 				}
 			}
@@ -382,7 +382,7 @@ func extendDo(plan []storageItem) (needReboot bool) {
 					}
 					item.FreeSpace -= addSpace
 					item.Size = newSize
-					fmt.Printf("Resize filesystem: %v to %v (+%v)\n", item.Path, formatSize(item.Size), formatSize(addSpace))
+					log.Printf("Resize filesystem: %v to %v (+%v)\n", item.Path, formatSize(item.Size), formatSize(addSpace))
 					break retryLoop4
 				case "xfs":
 					var tmpMountPoint string
@@ -433,7 +433,7 @@ func extendDo(plan []storageItem) (needReboot bool) {
 						log.Printf("Filesystem doesn't extend. Log of resize:\nstdout: %v\nstderr: %v\n", res, stderr)
 						continue retryLoop4
 					}
-					fmt.Printf("Resize filesystem: %v to %v (+%v)\n", item.Path, formatSize(item.Size), formatSize(addSpace))
+					log.Printf("Resize filesystem: %v to %v (+%v)\n", item.Path, formatSize(item.Size), formatSize(addSpace))
 					break retryLoop4
 				default:
 					log.Println("I don't know the filesystem: ", item.Path, item.FSType)
