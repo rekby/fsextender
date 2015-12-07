@@ -18,7 +18,7 @@ func main() {
 func Main() int {
 	if len(os.Args) < 2 || os.Args[1][0] != '/' {
 		printUsage()
-		return -1
+		return 128
 	}
 
 	startPoint := os.Args[1]

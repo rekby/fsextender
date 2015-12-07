@@ -16,6 +16,8 @@ Detect result:
 OK - if extended compele. Return code 0.
 NEED REBOOT AND START ME ONCE AGAIN. - if need reboot and run command with same parameters. Return code 1.
 
+Code > 127 mean error exit. (Now it print usages only).
+
 external dependencies:
 /proc/mounts - detect mount points
 /sys/
