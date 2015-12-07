@@ -23,7 +23,7 @@ type storageItemType int
 
 // Max depth of storage. Used for infinite loop detection.
 // Максимальная глубина стека устройств. В настроящий момент используется как простой определитель циклов
-const max_STORAGE_DEEP = 1000
+const max_STORAGE_DEEP = 100
 
 // Minimum size of created partition. For avoid create new partition with few KB of space.
 // Минимальный размер свободного места для создания нового раздела
