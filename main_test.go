@@ -96,9 +96,22 @@ func deleteTmpDevice(path string) {
 	finish := strings.Index(filePath, ")")
 	filePath = filePath[start+1 : finish]
 
-	cmd("sudo", "losetup", "-d", path)
+	// remove partitions
+	for _, part := range readPartitions(path) {
+		sudo("parted", "-s", path, "rm", strconv.Itoa(int(part.Number)))
+	}
+
+	sudo("sudo", "losetup", "-d", path)
 	os.Remove(filePath)
-	time.Sleep(time.Second) // time to kernel remove device
+
+	// Wait for umount device
+	for {
+		_, errString, _ := sudo("losetup", path)
+		if errString != "" {
+			break
+		}
+		time.Sleep(time.Second / 10) // time to kernel remove device
+	}
 }
 
 // Return volume of filesystem in 1-Gb blocks
@@ -921,6 +934,42 @@ func TestLVMPartitionIn2MiddleDiskGPT(t *testing.T) {
 	}
 	if string(testBytes) != "OK" {
 		t.Error("Bad file content:", string(testBytes))
+	}
+}
+
+func TestLVMPartitionWithoutFS(t *testing.T) {
+	disk, err := createTmpDevice("msdos")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer deleteTmpDevice(disk)
+
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(MSDOS_START_BYTE), s(MSDOS_START_BYTE+GB-1)) // 1Gb
+	sudo("parted", "-s", disk, "set", "1", "lvm", "on")
+
+	part := disk + "p1"
+	sudo("pvcreate", part)
+	defer sudo("pvremove", part)
+	sudo("vgcreate", LVM_VG_NAME, part)
+	defer sudo("vgremove", "-f", LVM_VG_NAME)
+	sudo("lvcreate", "-L", "500M", "-n", LVM_LV_NAME, LVM_VG_NAME)
+	lvmLV := filepath.Join("/dev", LVM_VG_NAME, LVM_LV_NAME)
+	defer sudo("lvremove", "-f", lvmLV)
+
+	call(lvmLV, "--do")
+
+	needPartitions := []testPartition{
+		{1, 32256, MSDOS_LAST_BYTE},
+	}
+	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
+	if partDiff != nil {
+		t.Error(partDiff)
+	}
+	lvmLVSize := lvmLVGetSize(LVM_VG_NAME + "/" + LVM_LV_NAME)
+	PartitionSize := uint64(MSDOS_LAST_BYTE - MSDOS_START_BYTE + 1)
+	MinSize := PartitionSize - 100*1024*1024
+	if lvmLVSize < MinSize || lvmLVSize > PartitionSize {
+		t.Error("LVM Size:", formatSize(lvmLVSize), lvmLVSize)
 	}
 }
 
