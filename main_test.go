@@ -31,7 +31,7 @@ type testPartition struct {
 	Last   uint64
 }
 
-func resetProgramState(){
+func resetProgramState() {
 	majorMinorDeviceTypeCache = make(map[[2]int]storageItem)
 	diskNewPartitionNumLastGeneratedNum = make(map[[2]int]uint32)
 }
@@ -549,7 +549,7 @@ func TestLVMPartitionADD_PV(t *testing.T) {
 	defer deleteTmpDevice(disk)
 
 	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(MSDOS_START_BYTE), s(GB-1)) // 1Gb
-	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(GB), s(MSDOS_LAST_BYTE)) // Free PV
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(GB), s(MSDOS_LAST_BYTE))    // Free PV
 	sudo("parted", "-s", disk, "set", "1", "lvm", "on")
 
 	part := disk + "p1"
@@ -584,7 +584,7 @@ func TestLVMPartitionADD_PV(t *testing.T) {
 	}
 
 	needPartitions := []testPartition{
-		{1, 32256, GB-1},
+		{1, 32256, GB - 1},
 		{2, GB, MSDOS_LAST_BYTE},
 	}
 	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
@@ -601,7 +601,70 @@ func TestLVMPartitionADD_PV(t *testing.T) {
 	}
 }
 
+func TestLVMPartition_ResivePV(t *testing.T) {
+	disk, err := createTmpDevice("msdos")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer deleteTmpDevice(disk)
 
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(MSDOS_START_BYTE), s(MSDOS_START_BYTE+GB)) // 1Gb
+	sudo("parted", "-s", disk, "set", "1", "lvm", "on")
+
+	part := disk + "p1"
+	sudo("pvcreate", part)
+	defer sudo("pvremove", part)
+
+	// Resize partition under PV and save old save of PV
+	sudo("parted", "-s", disk, "rm", "1")
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(MSDOS_START_BYTE), s(MSDOS_LAST_BYTE))
+	sudo("parted", "-s", disk, "set", "1", "lvm", "on")
+	sudo("blockdev", "--rereadpt", disk)
+
+	sudo("vgcreate", LVM_VG_NAME, part)
+	defer sudo("vgremove", "-f", LVM_VG_NAME)
+	sudo("lvcreate", "-L", "500M", "-n", LVM_LV_NAME, LVM_VG_NAME)
+	lvmLV := filepath.Join("/dev", LVM_VG_NAME, LVM_LV_NAME)
+	defer sudo("lvremove", "-f", lvmLV)
+
+	sudo("mkfs.xfs", lvmLV)
+
+	err = os.MkdirAll(TMP_MOUNT_DIR, 0700)
+	if err == nil {
+		defer os.Remove(TMP_MOUNT_DIR)
+	} else {
+		t.Fatal(err)
+	}
+	sudo("mount", lvmLV, TMP_MOUNT_DIR)
+	defer sudo("umount", lvmLV)
+
+	sudo("chmod", "a+rwx", TMP_MOUNT_DIR)
+	err = ioutil.WriteFile(filepath.Join(TMP_MOUNT_DIR, "test"), []byte("OK"), 0666)
+	if err != nil {
+		t.Error("Can't write test file", err)
+	}
+
+	call(TMP_MOUNT_DIR, "--do")
+	if 100 != df(TMP_MOUNT_DIR) {
+		t.Error("Filesystem size")
+	}
+
+	needPartitions := []testPartition{
+		{1, 32256, MSDOS_LAST_BYTE},
+	}
+	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
+	if partDiff != nil {
+		t.Error(partDiff)
+	}
+
+	testBytes, err := ioutil.ReadFile(filepath.Join(TMP_MOUNT_DIR, "test"))
+	if err != nil {
+		t.Error("Can't read test file", err)
+	}
+	if string(testBytes) != "OK" {
+		t.Error("Bad file content:", string(testBytes))
+	}
+}
 
 func TestLVMPartitionInMiddleDiskMSDOS(t *testing.T) {
 	disk, err := createTmpDevice("msdos")
@@ -849,7 +912,7 @@ func TestLVMPartitionIn2MiddleDiskGPT(t *testing.T) {
 	}
 }
 
-func TestRecursiveHierarchy(t *testing.T){
+func TestRecursiveHierarchy(t *testing.T) {
 	disk, err := createTmpDevice("msdos")
 	if err != nil {
 		t.Fatal(err)
