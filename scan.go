@@ -347,6 +347,7 @@ toScanLoop:
 					// Calc usable PV size
 					// для свободных pv  система выдает размер равный размеру раздела, так что испольузем расчетный размер
 					parent.Size = lvmPVCalcSize(pv.Size, item.LVMExtentSize)
+					parent.FreeSpace = parent.Size
 					toScan = append(toScan, parent)
 				} else if pv.VolumeGroup == item.Path {
 					// LVM PV in the LV group
