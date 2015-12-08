@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"github.com/rekby/pflag"
+	"path/filepath"
 )
 
 const DEBUG = false
@@ -16,9 +18,12 @@ func main() {
 }
 
 func Main() int {
-	if len(os.Args) < 2 || os.Args[1][0] != '/' {
+	do := pflag.Bool("do", false, "Execute plan instead of print it")
+	pflag.Parse()
+
+	if pflag.NArg() != 1 || !filepath.IsAbs(pflag.Arg(0)) {
 		printUsage()
-		return 1
+		return 11
 	}
 
 	startPoint := os.Args[1]
@@ -33,7 +38,7 @@ func Main() int {
 	}
 	plan := extendPlan(storage)
 
-	if len(os.Args) > 2 && os.Args[2] == "--do" {
+	if *do {
 		if extendDo(plan) {
 			fmt.Println("NEED REBOOT AND START ME ONCE AGAIN.")
 			return 128
@@ -49,13 +54,14 @@ func Main() int {
 
 func printUsage() {
 	fmt.Printf(`Usage: %v <start_point> [--do]
-start_point - path to block device or file system to extend
---do - do extending. Without it - print extend plan only.
+Detect result:
+OK - if extended compele. Return code 0.
+NEED REBOOT AND START ME ONCE AGAIN. - if need reboot and run command with same parameters. Return code 128.
 
-The program print to stdout:
-OK - if extended compele.
-NEED REBOOT AND START ME ONCE AGAIN. - if need reboot and run command with same parameters
+0 < Code < 128 mean error exit. (Now it print usages and panic only).
+
 `, os.Args[0])
+	pflag.PrintDefaults()
 }
 
 func cmd(cmd string, args ...string) (stdout, errout string, err error) {
