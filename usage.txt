@@ -7,7 +7,7 @@ fsextender [--filter=LVM_ALREADY_PLACED] /home [--do]
        Без --do - печатается план изменений. но никаких операций не выполняется
 
 --filter, -f - filter block devices for extend LVM volume group.
-      if it equal LVM_ALREADY_PLACED (default) - LVM vg extend only by space on disk
+    if it equal LVM_ALREADY_PLACED (default) - LVM vg extend only by space on disk
     in which PV of the lvm VG already placed. It can create new partitions and extend existed.
     If you want no limit to extend LVM use empty filter: --filter=
     If you want own limit: write regexp with your rules. You can use many rules, separated
