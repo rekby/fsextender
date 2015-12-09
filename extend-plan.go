@@ -66,7 +66,7 @@ func extendPlan(storage []storageItem, filter string) (plan []storageItem, err e
 	filter = expandFilter(storage, filter)
 	filterRE, err := regexp.Compile(filter)
 	if err != nil {
-		err = errors.New("Error while compile filter error: " + err.Error())
+		err = errors.New("Error while compile filter regexp: " + err.Error())
 		return nil, err
 	}
 
