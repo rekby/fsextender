@@ -26,7 +26,7 @@ func Main() int {
 		return 11
 	}
 
-	startPoint := os.Args[1]
+	startPoint := pflag.Arg(0)
 	storage, err := extendScanWays(startPoint)
 	//	fmt.Println("SCAN PLAN:")
 	//	extendPrint(storage)
