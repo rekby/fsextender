@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/rekby/pflag"
 	"github.com/rekby/pretty"
 	"io/ioutil"
 	"os"
@@ -32,6 +33,7 @@ type testPartition struct {
 }
 
 func resetProgramState() {
+	pflag.CommandLine = pflag.NewFlagSet(os.Args[0], pflag.ExitOnError)
 	majorMinorDeviceTypeCache = make(map[[2]int]storageItem)
 	diskNewPartitionNumLastGeneratedNum = make(map[[2]int]uint32)
 }
