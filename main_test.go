@@ -44,7 +44,6 @@ func call(args ...string) {
 		// for test coverage run test as root
 		oldArgs := os.Args
 		os.Args = append([]string{os.Args[0]}, args...)
-
 		// Clean old environment
 		resetProgramState()
 
@@ -1007,5 +1006,231 @@ func TestRecursiveHierarchy(t *testing.T) {
 		t.Error("MUST detect hierarchy recursive error")
 	} else {
 		t.Log("Recursive error OK detected as:", err)
+	}
+}
+
+func TestLVMPartition_LimitFilterForAlreadyPlacedOneDevice(t *testing.T) {
+	disk, err := createTmpDevice("msdos")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer deleteTmpDevice(disk)
+
+	disk2, err := createTmpDevice("msdos")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer deleteTmpDevice(disk2)
+
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(MSDOS_START_BYTE), s(MSDOS_START_BYTE+GB)) // 1Gb
+	sudo("parted", "-s", disk, "set", "1", "lvm", "on")
+
+	part := disk + "p1"
+	sudo("pvcreate", part)
+	defer sudo("pvremove", part)
+	sudo("vgcreate", LVM_VG_NAME, part)
+	defer sudo("vgremove", "-f", LVM_VG_NAME)
+	sudo("lvcreate", "-L", "500M", "-n", LVM_LV_NAME, LVM_VG_NAME)
+	lvmLV := filepath.Join("/dev", LVM_VG_NAME, LVM_LV_NAME)
+	defer sudo("lvremove", "-f", lvmLV)
+
+	sudo("mkfs.xfs", lvmLV)
+
+	err = os.MkdirAll(TMP_MOUNT_DIR, 0700)
+	if err == nil {
+		defer os.Remove(TMP_MOUNT_DIR)
+	} else {
+		t.Fatal(err)
+	}
+	sudo("mount", lvmLV, TMP_MOUNT_DIR)
+	defer sudo("umount", lvmLV)
+
+	sudo("chmod", "a+rwx", TMP_MOUNT_DIR)
+	err = ioutil.WriteFile(filepath.Join(TMP_MOUNT_DIR, "test"), []byte("OK"), 0666)
+	if err != nil {
+		t.Error("Can't write test file", err)
+	}
+
+	call("--filter=LVM_ALREADY_PLACED", TMP_MOUNT_DIR, "--do")
+	if 100 != df(TMP_MOUNT_DIR) {
+		t.Error("Filesystem size", df(TMP_MOUNT_DIR))
+	}
+
+	needPartitions := []testPartition{
+		{1, 32256, MSDOS_LAST_BYTE},
+	}
+	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
+	if partDiff != nil {
+		t.Error(partDiff)
+	}
+
+	if len(readPartitions(disk2)) != 0 {
+		t.Error(pretty.Sprintf("%v", readPartitions(disk2)))
+	}
+
+	testBytes, err := ioutil.ReadFile(filepath.Join(TMP_MOUNT_DIR, "test"))
+	if err != nil {
+		t.Error("Can't read test file", err)
+	}
+	if string(testBytes) != "OK" {
+		t.Error("Bad file content:", string(testBytes))
+	}
+}
+
+func TestLVMPartition_LimitFilterForAlreadyPlacedTwoDevices(t *testing.T) {
+	disk, err := createTmpDevice("msdos")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer deleteTmpDevice(disk)
+
+	disk2, err := createTmpDevice("msdos")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer deleteTmpDevice(disk2)
+
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(MSDOS_START_BYTE), s(MSDOS_START_BYTE+GB)) // 1Gb
+	sudo("parted", "-s", disk, "set", "1", "lvm", "on")
+	sudo("parted", "-s", disk2, "unit", "b", "mkpart", "primary", s(MSDOS_START_BYTE), s(MSDOS_START_BYTE+GB)) // 1Gb
+	sudo("parted", "-s", disk2, "set", "1", "lvm", "on")
+
+	part := disk + "p1"
+	part2 := disk2 + "p1"
+
+	sudo("pvcreate", part)
+	sudo("pvcreate", part2)
+	defer sudo("pvremove", part)
+	defer sudo("pvremove", part2)
+
+	sudo("vgcreate", LVM_VG_NAME, part, part2)
+	defer sudo("vgremove", "-f", LVM_VG_NAME)
+	sudo("lvcreate", "-L", "500M", "-n", LVM_LV_NAME, LVM_VG_NAME)
+	lvmLV := filepath.Join("/dev", LVM_VG_NAME, LVM_LV_NAME)
+	defer sudo("lvremove", "-f", lvmLV)
+
+	sudo("mkfs.xfs", lvmLV)
+
+	err = os.MkdirAll(TMP_MOUNT_DIR, 0700)
+	if err == nil {
+		defer os.Remove(TMP_MOUNT_DIR)
+	} else {
+		t.Fatal(err)
+	}
+	sudo("mount", lvmLV, TMP_MOUNT_DIR)
+	defer sudo("umount", lvmLV)
+
+	sudo("chmod", "a+rwx", TMP_MOUNT_DIR)
+	err = ioutil.WriteFile(filepath.Join(TMP_MOUNT_DIR, "test"), []byte("OK"), 0666)
+	if err != nil {
+		t.Error("Can't write test file", err)
+	}
+
+	call("--filter=LVM_ALREADY_PLACED", TMP_MOUNT_DIR, "--do")
+	if 200 != df(TMP_MOUNT_DIR) {
+		t.Error("Filesystem size", df(TMP_MOUNT_DIR))
+	}
+
+	needPartitions := []testPartition{
+		{1, 32256, MSDOS_LAST_BYTE},
+	}
+	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
+	if partDiff != nil {
+		t.Error(partDiff)
+	}
+
+	// Same layout for disk 2
+	partDiff = pretty.Diff(readPartitions(disk2), needPartitions)
+	if partDiff != nil {
+		t.Error(partDiff)
+	}
+
+	testBytes, err := ioutil.ReadFile(filepath.Join(TMP_MOUNT_DIR, "test"))
+	if err != nil {
+		t.Error("Can't read test file", err)
+	}
+	if string(testBytes) != "OK" {
+		t.Error("Bad file content:", string(testBytes))
+	}
+}
+
+func TestLVMPartition_LimitFilterOneDeviceWhilePlacedInTwo(t *testing.T) {
+	disk, err := createTmpDevice("msdos")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer deleteTmpDevice(disk)
+
+	disk2, err := createTmpDevice("msdos")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer deleteTmpDevice(disk2)
+
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(MSDOS_START_BYTE), s(MSDOS_START_BYTE+GB-1)) // 1Gb
+	sudo("parted", "-s", disk, "set", "1", "lvm", "on")
+	sudo("parted", "-s", disk2, "unit", "b", "mkpart", "primary", s(MSDOS_START_BYTE), s(MSDOS_START_BYTE+GB-1)) // 1Gb
+	sudo("parted", "-s", disk2, "set", "1", "lvm", "on")
+
+	part := disk + "p1"
+	part2 := disk2 + "p1"
+
+	sudo("pvcreate", part)
+	sudo("pvcreate", part2)
+	defer sudo("pvremove", part)
+	defer sudo("pvremove", part2)
+
+	sudo("vgcreate", LVM_VG_NAME, part)
+	defer sudo("vgremove", "-f", LVM_VG_NAME)
+	sudo("lvcreate", "-L", "500M", "-n", LVM_LV_NAME, LVM_VG_NAME)
+	lvmLV := filepath.Join("/dev", LVM_VG_NAME, LVM_LV_NAME)
+	defer sudo("lvremove", "-f", lvmLV)
+
+	sudo("vgextend", LVM_VG_NAME, part2)
+
+	sudo("mkfs.xfs", lvmLV)
+
+	err = os.MkdirAll(TMP_MOUNT_DIR, 0700)
+	if err == nil {
+		defer os.Remove(TMP_MOUNT_DIR)
+	} else {
+		t.Fatal(err)
+	}
+	sudo("mount", lvmLV, TMP_MOUNT_DIR)
+	defer sudo("umount", lvmLV)
+
+	sudo("chmod", "a+rwx", TMP_MOUNT_DIR)
+	err = ioutil.WriteFile(filepath.Join(TMP_MOUNT_DIR, "test"), []byte("OK"), 0666)
+	if err != nil {
+		t.Error("Can't write test file", err)
+	}
+
+	call("--filter="+disk, TMP_MOUNT_DIR, "--do") // filter for one disk only
+	if 101 != df(TMP_MOUNT_DIR) {                 // 100 from first disk + 1 from pv existed in second disk
+		t.Error("Filesystem size", df(TMP_MOUNT_DIR))
+	}
+
+	needPartitions := []testPartition{
+		{1, MSDOS_START_BYTE, MSDOS_LAST_BYTE},
+	}
+	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
+	if partDiff != nil {
+		t.Error(partDiff)
+	}
+
+	needPartitions2 := []testPartition{
+		{1, MSDOS_START_BYTE, MSDOS_START_BYTE + GB - 1},
+	}
+	partDiff = pretty.Diff(readPartitions(disk2), needPartitions2)
+	if partDiff != nil {
+		t.Error(partDiff)
+	}
+
+	testBytes, err := ioutil.ReadFile(filepath.Join(TMP_MOUNT_DIR, "test"))
+	if err != nil {
+		t.Error("Can't read test file", err)
+	}
+	if string(testBytes) != "OK" {
+		t.Error("Bad file content:", string(testBytes))
 	}
 }

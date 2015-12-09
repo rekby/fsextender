@@ -50,6 +50,9 @@ const (
 	type_LVM_LV
 	type_PARTITION
 	type_PARTITION_NEW
+
+	type_SKIP
+	type_LAST // Doesn't use in work - for tests only.
 )
 
 type storageItem struct {
@@ -64,6 +67,9 @@ type storageItem struct {
 	FSType        string    // Type of file system (for type type_FS) тип файловой системы (для типа type_FS)
 	Partition     partition // For types type_PARTITION and type_PARTITION_NEW. Описание раздела диска - для типов (type_PARTITION, type_PARTITION_NEW)
 	LVMExtentSize uint64    // Extent size for type_LVM_GROUP, type_LVM_PV, type_LVM_PV_ADD, type_LVM_PV_NEW. Размер экстента для типа type_LVM_GROUP, type_LVM_PV, type_LVM_PV_ADD, type_LVM_PV_NEW
+
+	SkipReason string
+	OldType    storageItemType // Type of item before skip
 }
 
 func (this storageItem) String() string {

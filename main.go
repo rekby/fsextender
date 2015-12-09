@@ -3,12 +3,12 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"github.com/rekby/pflag"
 	"log"
 	"os"
 	"os/exec"
-	"strings"
-	"github.com/rekby/pflag"
 	"path/filepath"
+	"strings"
 )
 
 const DEBUG = false
@@ -19,6 +19,7 @@ func main() {
 
 func Main() int {
 	do := pflag.Bool("do", false, "Execute plan instead of print it")
+	filter := pflag.StringP("filter", "f", FILTER_LVM_ALREADY_PLACED, "filter of disks, which use for partition extends")
 	pflag.Parse()
 
 	if pflag.NArg() != 1 || !filepath.IsAbs(pflag.Arg(0)) {
@@ -36,7 +37,11 @@ func Main() int {
 	if err != nil {
 		panic(err)
 	}
-	plan := extendPlan(storage)
+	plan, err := extendPlan(storage, *filter)
+	if err != nil {
+		log.Println("Error while make extend plan:", err)
+		return 11
+	}
 
 	if *do {
 		if extendDo(plan) {
