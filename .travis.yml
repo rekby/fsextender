@@ -7,6 +7,8 @@ go:
     - 1.5
 
 env:
+    - CGO_ENABLED=0
+    - GOARCH=386
     - secure: "TIyZML/ZCRAabOqYlOubbsFN5v9P+yVVqhD8LUx0TenAWouh0CZ8mt3hwUcxF3vy+xphdTWOA+tpRhkyFHKLzntlBUTOFWmWrOL76MqrMk9ONQVCOalKUQPnofgc/00axzYflPfn9nIDYsACYLHvIimEw/nNNLVJygLoziyEwSOThKz4fIIc7EzLxPwBI/Lm811RUi8O+rvPiGrV2VwctiCAV+9j18yyCyletrY/DT4GPk1ruzhcE6Nh4gM3DJpJHk9dFVgHucfnnE4Xr//GOrvSUDRdaiqC6pMn7+f2DIVOmHvrTixHzJQBqmUyrnrB8NWQSEy4z4VK+QX77TU5hBx0ASAqyX697BqWfi4XP6vlWSpaZLq/PutuTveQa2l+qH7VPVx5GTGC9aeBAwXciF3AR8iEJkKLlrxkuQW884G9AqXAdDuCKPU8e/bpfj8UWuUYmScLeY/a89Ms6Ub3dKN+Mfsdt/agd2mYmp6CBqOq5TC0kBpzvskAhJiXNV42dB9wsjk/yZavJWXhkuzjoLmq/jcvsydo+we61zjG5GRwBgvegq6C62122+A7tMiVD7Rh9bqvwiRxnPQqjLubZTZfvVbUf4ORBgdhNNH2c1xu5Iq1VCICY8XpNXIMaPxbeFdB+9DQ58gus65U15m//4M9qNICoyqYpWzA3xPSOiw=" # For coveralls.io
 
 before_script:
