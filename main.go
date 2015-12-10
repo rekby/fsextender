@@ -13,17 +13,40 @@ import (
 
 const DEBUG = false
 
+//go:generate go-bindata README.md usage.txt
 func main() {
 	os.Exit(Main())
 }
 
 func Main() int {
+	showHelp := pflag.BoolP("help", "h", false, "Show long usage manual")
+	showReadme := pflag.Bool("readme", false, "Show readme")
 	do := pflag.Bool("do", false, "Execute plan instead of print it")
 	filter := pflag.StringP("filter", "f", FILTER_LVM_ALREADY_PLACED, "filter of disks, which use for partition extends")
 	pflag.Parse()
 
+	if *showHelp {
+		txt, err := usageTxtBytes()
+		if err != nil {
+			log.Println(err)
+			return 11
+		}
+		fmt.Println(string(txt))
+		return 0
+	}
+
+	if *showReadme {
+		txt, err := readmeMdBytes()
+		if err != nil {
+			log.Println(err)
+			return 11
+		}
+		fmt.Println(string(txt))
+		return 0
+	}
+
 	if pflag.NArg() != 1 || !filepath.IsAbs(pflag.Arg(0)) {
-		printUsage()
+		printShortUsage()
 		return 11
 	}
 
@@ -57,14 +80,15 @@ func Main() int {
 	}
 }
 
-func printUsage() {
-	fmt.Printf(`Usage: %v <start_point> [--do]
+func printShortUsage() {
+	fmt.Printf(`Short usage: %v [options] <start_point>
 Detect result:
 OK - if extended compele. Return code 0.
 NEED REBOOT AND START ME ONCE AGAIN. - if need reboot and run command with same parameters. Return code 128.
 
 0 < Code < 128 mean error exit. (Now it print usages and panic only).
 
+Options:
 `, os.Args[0])
 	pflag.PrintDefaults()
 }
