@@ -439,6 +439,10 @@ func extendDo(plan []storageItem) (needReboot bool) {
 					log.Println("I don't know the filesystem: ", item.Path, item.FSType)
 				}
 			}
+		case type_SKIP:
+			log.Println("Skip item:", item.SkipReason, item.OldType, item.Path, formatSize(item.Size))
+		case type_UNKNOWN:
+			log.Println("Unknown item type:", item.Type, item.Path)
 		default:
 			log.Println("I don't know way to resize type: ", item.Type)
 		}

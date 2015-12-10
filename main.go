@@ -3,25 +3,54 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"github.com/rekby/pflag"
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
 const DEBUG = false
 
+//go:generate go-bindata README.md usage.txt
 func main() {
 	os.Exit(Main())
 }
 
 func Main() int {
-	if len(os.Args) < 2 || os.Args[1][0] != '/' {
-		printUsage()
-		return 1
+	showHelp := pflag.BoolP("help", "h", false, "Show long usage manual")
+	showReadme := pflag.Bool("readme", false, "Show readme")
+	do := pflag.Bool("do", false, "Execute plan instead of print it")
+	filter := pflag.StringP("filter", "f", FILTER_LVM_ALREADY_PLACED, "filter of disks, which use for partition extends")
+	pflag.Parse()
+
+	if *showHelp {
+		txt, err := usageTxtBytes()
+		if err != nil {
+			log.Println(err)
+			return 11
+		}
+		fmt.Println(string(txt))
+		return 0
 	}
 
-	startPoint := os.Args[1]
+	if *showReadme {
+		txt, err := readmeMdBytes()
+		if err != nil {
+			log.Println(err)
+			return 11
+		}
+		fmt.Println(string(txt))
+		return 0
+	}
+
+	if pflag.NArg() != 1 || !filepath.IsAbs(pflag.Arg(0)) {
+		printShortUsage()
+		return 11
+	}
+
+	startPoint := pflag.Arg(0)
 	storage, err := extendScanWays(startPoint)
 	//	fmt.Println("SCAN PLAN:")
 	//	extendPrint(storage)
@@ -31,9 +60,13 @@ func Main() int {
 	if err != nil {
 		panic(err)
 	}
-	plan := extendPlan(storage)
+	plan, err := extendPlan(storage, *filter)
+	if err != nil {
+		log.Println("Error while make extend plan:", err)
+		return 11
+	}
 
-	if len(os.Args) > 2 && os.Args[2] == "--do" {
+	if *do {
 		if extendDo(plan) {
 			fmt.Println("NEED REBOOT AND START ME ONCE AGAIN.")
 			return 128
@@ -47,15 +80,17 @@ func Main() int {
 	}
 }
 
-func printUsage() {
-	fmt.Printf(`Usage: %v <start_point> [--do]
-start_point - path to block device or file system to extend
---do - do extending. Without it - print extend plan only.
+func printShortUsage() {
+	fmt.Printf(`Short usage: %v [options] <start_point>
+Detect result:
+OK - if extended compele. Return code 0.
+NEED REBOOT AND START ME ONCE AGAIN. - if need reboot and run command with same parameters. Return code 128.
 
-The program print to stdout:
-OK - if extended compele.
-NEED REBOOT AND START ME ONCE AGAIN. - if need reboot and run command with same parameters
+0 < Code < 128 mean error exit. (Now it print usages and panic only).
+
+Options:
 `, os.Args[0])
+	pflag.PrintDefaults()
 }
 
 func cmd(cmd string, args ...string) (stdout, errout string, err error) {

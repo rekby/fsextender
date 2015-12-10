@@ -1,24 +1,27 @@
 [![Build Status](https://travis-ci.org/rekby/fsextender.svg)](https://travis-ci.org/rekby/fsextender)
 [![Coverage Status](https://coveralls.io/repos/rekby/fsextender/badge.svg?branch=master&service=github)](https://coveralls.io/github/rekby/fsextender?branch=master)
 
-Extend filesystem to max size.
+Extend filesystem to max size with underliing layers.
+It can extend: ext3, ext4, xfs, LVM Logical volume, LVM Physical volume, LVM Volume Group (with new or free pv)
+, partitions in MSDOS and GPT partition tables.
+It can create new partitions and LVM Physical volumes on disk with MSDOS and GPT partition tables.
 
-If filesystem lie on LVM-volume - extend lvm volume and lvm volume group to max size too (extend partitions, create new
-partitions and etc).
+Расширяет файловую систему до максимального размера, вместе с нижележащими слоями.
+Может расширять: ext3, ext4, xfs, логические и физические тома LVM, LVM Volume Group (за счет создания новых
+физических томов и использования уже созданных, но свободных), разделы на дисках с таблицами разделов MSDOS
+и GPT.
+Может создавать: новые разделы и физические тома LVM на дисках с таблицами разделов MSDOS и GPT.
 
 Usage example:
-fsextender /home [--do]
+Пример использования:
+fsextender [--filter=LVM_ALREADY_PLACED] /home [--do]
 
---do - do modify partitions (without print plan).
-Without --do - print plan.
-
-Detect result:
-OK - if extended compele. Return code 0.
-NEED REBOOT AND START ME ONCE AGAIN. - if need reboot and run command with same parameters. Return code 128.
-
-0 < Code < 128 mean error exit. (Now it print usages and panic only).
+Instruction see in usage.txt
+Инструкцию смотрите в usage.txt
 
 external dependencies:
+Внешние зависимости:
+
 /proc/mounts - detect mount points
 /sys/
 

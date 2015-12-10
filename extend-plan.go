@@ -1,9 +1,59 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"log"
+	"regexp"
+	"sort"
 	"strconv"
+	"strings"
 )
+
+const FILTER_LVM_ALREADY_PLACED = "LVM_ALREADY_PLACED"
+const REGEXP_CHARS = "^*+?[]"
+
+func expandFilter(storage []storageItem, filter string) string {
+	var expressions = make(map[string]bool)
+	for _, part := range strings.Split(filter, ",") {
+		if part == FILTER_LVM_ALREADY_PLACED {
+			for vgIndex, vg := range storage {
+				if vg.Type != type_LVM_GROUP {
+					continue
+				}
+
+				for partIndex := vgIndex + 1; partIndex < len(storage); partIndex++ {
+					part := storage[partIndex]
+					if part.Child != vgIndex || part.Type != type_LVM_PV {
+						continue
+					}
+					diskPath, _, err := extractPartNumber(part.Path)
+					if err != nil {
+						log.Println("Can't extract disk path.", part.Type, part.Path, err)
+						continue
+					}
+					express := "^" + diskPath + "[^/]*$"
+					expressions[express] = true
+				}
+			}
+		} else {
+			expressions[part] = true
+		}
+	}
+
+	var res []string
+	for part := range expressions {
+		if len(part) > 0 && !(part[len(part)-1] == '/') && !strings.ContainsAny(part, REGEXP_CHARS) {
+			part += "[^/]*$"
+		}
+		if len(part) > 0 && part[0] == '/' {
+			part = "^" + part
+		}
+		res = append(res, part)
+	}
+	sort.Strings(res)
+	return strings.Join(res, "|")
+}
 
 /*
 storage - description of storages hierarhy and ways of extend them. storage[0] - top of hierarchy, target of extend.
@@ -12,13 +62,40 @@ storage can be modify while work the function. You have to store copy of them if
 storage - описание иерархии и возможных путей расширения раздела. storage[0] - вершина, целевая точка расширения.
 в процессе работы функции storage может портиться. Если важно его сохранение нужно сохранить у себя копию.
 */
-func extendPlan(storage []storageItem) (plan []storageItem) {
+func extendPlan(storage []storageItem, filter string) (plan []storageItem, err error) {
+	filter = expandFilter(storage, filter)
+	filterRE, err := regexp.Compile(filter)
+	if err != nil {
+		err = errors.New("Error while compile filter regexp: " + err.Error())
+		return nil, err
+	}
+
+	/*
+		Cancel create/extend parititions by filters
+		Отменяем создание/расширение разделов не подходящих под фильтры
+	*/
+	for i := range storage {
+		item := &storage[i]
+		switch item.Type {
+		case type_PARTITION, type_PARTITION_NEW, type_LVM_PV, type_LVM_PV_ADD, type_LVM_PV_NEW:
+			if !filterRE.MatchString(item.Path) {
+				item.OldType = item.Type
+				item.Type = type_SKIP
+				item.SkipReason = "Skip by filters."
+			}
+		}
+	}
+
 	/*
 		When it can create new partition or extend current partition - always select extend.
 		Если есть возможность расширить существующий раздел и создать новый на этом же месте - выбираем расширение
 		уже сущуствующего
 	*/
 	for i, item := range storage {
+		if item.Type == type_SKIP {
+			continue
+		}
+
 		// For every partition, what can be extended
 		// Для каждого раздела, который возможно расширить
 		if item.Type == type_PARTITION && item.FreeSpace > 0 {
@@ -44,12 +121,16 @@ func extendPlan(storage []storageItem) (plan []storageItem) {
 				// Cancel create LVM PV for cancelled partition
 				// Отменяем создание LVM PV на этом томе
 				if newItem.Child != -1 && storage[newItem.Child].Type == type_LVM_PV_NEW {
-					storage[newItem.Child].Type = type_UNKNOWN
+					storage[newItem.Child].OldType = storage[newItem.Child].Type
+					storage[newItem.Child].Type = type_SKIP
+					storage[newItem.Child].SkipReason = "Partition layout optimization. Partition number may be wrong becouse it optimize too."
 				}
 
 				// Cancel create partition
 				// Выключаем создание нового раздела из дальнейшей работы
-				storage[newI].Type = type_UNKNOWN
+				storage[newI].OldType = storage[newI].Type
+				storage[newI].Type = type_SKIP
+				storage[newI].SkipReason = "Partition layout optimization. Partition number may be wrong becouse it optimize too."
 
 				// Decrease created partnumbers after this
 				// Уменьшаем номера далее создаваемых разделов на этом же диске
@@ -107,7 +188,7 @@ func extendPlan(storage []storageItem) (plan []storageItem) {
 		item := &plan[i]
 		item.Child = planMap[item.Child]
 	}
-	return plan
+	return plan, nil
 }
 
 func formatUInt(num uint64) string {

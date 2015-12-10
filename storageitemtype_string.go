@@ -4,9 +4,9 @@ package main
 
 import "fmt"
 
-const _storageItemType_name = "type_UNKNOWNtype_FStype_DISKtype_LVM_GROUPtype_LVM_PVtype_LVM_PV_ADDtype_LVM_PV_NEWtype_LVM_LVtype_PARTITIONtype_PARTITION_NEW"
+const _storageItemType_name = "type_UNKNOWNtype_FStype_DISKtype_LVM_GROUPtype_LVM_PVtype_LVM_PV_ADDtype_LVM_PV_NEWtype_LVM_LVtype_PARTITIONtype_PARTITION_NEWtype_SKIPtype_LAST"
 
-var _storageItemType_index = [...]uint8{0, 12, 19, 28, 42, 53, 68, 83, 94, 108, 126}
+var _storageItemType_index = [...]uint8{0, 12, 19, 28, 42, 53, 68, 83, 94, 108, 126, 135, 144}
 
 func (i storageItemType) String() string {
 	if i < 0 || i >= storageItemType(len(_storageItemType_index)-1) {
