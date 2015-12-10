@@ -1,9 +1,42 @@
 package main
 
 import (
+	"bytes"
+	"io/ioutil"
 	"strings"
 	"testing"
 )
+
+func TestDocumentationActual(t *testing.T) {
+	var err error
+	var builtinBytes, originalBytes []byte
+
+	// Usage
+	originalBytes, err = ioutil.ReadFile("usage.txt")
+	if err != nil {
+		t.Error(err)
+	}
+	builtinBytes, err = usageTxtBytes()
+	if err != nil {
+		t.Error(err)
+	}
+	if !bytes.Equal(originalBytes, builtinBytes) {
+		t.Error("Usage actual")
+	}
+
+	// Readme
+	originalBytes, err = ioutil.ReadFile("README.md")
+	if err != nil {
+		t.Error(err)
+	}
+	builtinBytes, err = readmeMdBytes()
+	if err != nil {
+		t.Error(err)
+	}
+	if !bytes.Equal(originalBytes, builtinBytes) {
+		t.Error("Readme actual")
+	}
+}
 
 func TestExpandFilter(t *testing.T) {
 	if expandFilter(nil, "") != "" {
