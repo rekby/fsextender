@@ -313,6 +313,16 @@ toScanLoop:
 					item.FreeSpace = uint64(freeSpace.LastByte - partition.LastByte)
 				}
 			}
+			// If partition has not fund, example: extended partition in mbr
+			// Если раздел не найден, например расширенный раздел mbr
+			if item.Partition.Number == 0 {
+				item.Type = type_SKIP
+				if disk.PartTable == "msdos" && partNumber > 4 {
+					item.SkipReason = "Extended partition on mbr"
+				} else {
+					item.SkipReason = "Coud not found partition in partition table"
+				}
+			}
 			storage = append(storage, item)
 
 			// LVM_PV free space detection

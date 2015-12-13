@@ -1304,6 +1304,24 @@ func TestLVMPartition_LVMInOneDiskFilterIsNullAndtwoDisksForExtend(t *testing.T)
 	}
 }
 
+func TestIssue13_ReadExtendedPartitions(t *testing.T) {
+	disk, err := createTmpDevice("msdos")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer deleteTmpDevice(disk)
+
+	sudo("parted", "-s", disk, "mkpart", "extended", "0%", "100%")
+	defer sudo("parted", "-s", disk, "rm", "1")
+	sudo("parted", "-s", disk, "mkpart", "logical", "1G", "2G")
+	defer sudo("parted", "-s", disk, "rm", "5")
+	part := disk + "p5"
+	sudo("mkfs.xfs", part)
+
+	// in issue failed by panic
+	call("--do", part)
+}
+
 // https://github.com/rekby/fsextender/issues/14
 func TestIssue14_ExtractPartNumberFromLinks(t *testing.T) {
 	disk, err := createTmpDevice("msdos")
@@ -1350,5 +1368,4 @@ func TestIssue14_ExtractPartNumberFromLinks(t *testing.T) {
 	if partDiff != nil {
 		t.Error(partDiff)
 	}
-
 }
