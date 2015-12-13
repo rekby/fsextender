@@ -185,6 +185,16 @@ partNumLoop:
 
 func extendScanWays(startPoint string) (storage []storageItem, err error) {
 	startPoint = filepath.Clean(startPoint)
+	startPoint, err = filepath.Abs(startPoint)
+	if err != nil {
+		log.Println("Can't abs of startpoint: ", startPoint)
+		return
+	}
+	startPoint, err = readLink(startPoint)
+	if err != nil {
+		log.Println("Can't readlink of startpoint: ", startPoint)
+		return
+	}
 	scanLVM()
 
 	// Check if startPoint is mount point of file system. If yes - find mounted device. Take last mount line.
@@ -209,6 +219,11 @@ func extendScanWays(startPoint string) (storage []storageItem, err error) {
 	}
 	if mountFrom != "" {
 		startPoint = mountFrom
+	}
+	startPoint, err = readLink(startPoint)
+	if err != nil {
+		log.Println("Can't read symlink for mountpoint: ", startPoint, err)
+		return
 	}
 	storage = make([]storageItem, 0)
 
@@ -919,4 +934,26 @@ func scanLVM() {
 		}
 		majorMinorDeviceTypeCache[[2]int{major, minor}] = storageItem{Path: path, Type: type_LVM_LV, Size: size}
 	}
+}
+
+func readLink(path string) (res string, err error) {
+	stat, err := os.Lstat(path)
+	if err != nil {
+		log.Println("Can't stat while Readlink: ", path, err)
+		return path, err
+	}
+	if stat.Mode()&os.ModeSymlink == os.ModeSymlink {
+		res, err = os.Readlink(path)
+		if err != nil {
+			log.Println("Can't readlink:", path, err)
+			return
+		}
+		if !filepath.IsAbs(res) {
+			res = filepath.Join(filepath.Dir(path), res)
+		}
+	} else {
+		return path, nil
+	}
+
+	return
 }

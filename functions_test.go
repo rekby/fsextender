@@ -3,6 +3,9 @@ package fsextender
 import (
 	"bytes"
 	"io/ioutil"
+	"log"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -134,5 +137,40 @@ func TestItemTypeToString(t *testing.T) {
 	}
 	if !strings.HasPrefix(storageItemType(type_LAST+1).String(), "storageItemType(") {
 		t.Error(storageItemType(type_LAST + 1).String())
+	}
+}
+
+func TestReadLink(t *testing.T) {
+	var dir, res string
+	var err error
+
+	dir, err = ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	fn := func(f string) string {
+		return filepath.Join(dir, f)
+	}
+
+	log.SetOutput(&bytes.Buffer{})
+	res, err = readLink(fn("new"))
+	log.SetOutput(os.Stderr)
+
+	if res != fn("new") || !os.IsNotExist(err) {
+		t.Error(res, err)
+	}
+
+	ioutil.WriteFile(fn("0"), []byte{}, 0600)
+	res, err = readLink(fn("0"))
+	if res != fn("0") || err != nil {
+		t.Error(res, err)
+	}
+
+	os.Symlink(fn("0"), fn("1"))
+	res, err = readLink(fn("1"))
+	if res != fn("0") || err != nil {
+		t.Error(res, err)
 	}
 }

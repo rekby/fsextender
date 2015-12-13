@@ -1303,3 +1303,52 @@ func TestLVMPartition_LVMInOneDiskFilterIsNullAndtwoDisksForExtend(t *testing.T)
 		t.Error("Bad file content:", string(testBytes))
 	}
 }
+
+// https://github.com/rekby/fsextender/issues/14
+func TestIssue14_ExtractPartNumberFromLinks(t *testing.T) {
+	disk, err := createTmpDevice("msdos")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer deleteTmpDevice(disk)
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(MSDOS_START_BYTE), s(GB-1))
+	defer sudo("parted", "-s", disk, "rm", "1")
+
+	part := disk + "p1"
+	sudo("mkfs.xfs", disk+"p1")
+	sudo("xfs_admin", "-U", "78c1656c-a17f-11e5-b076-74e6e20dc9f0", part)
+
+	for i := 0; i < TRY_COUNT; i++ {
+		_, err = os.Stat("/dev/disk/by-uuid/78c1656c-a17f-11e5-b076-74e6e20dc9f0")
+		if os.IsNotExist(err) {
+			if i < TRY_COUNT-1 {
+				time.Sleep(time.Second)
+			}
+		} else {
+			break
+		}
+	}
+	if err != nil {
+		t.Fatal("Can't create symlink")
+	}
+
+	err = os.MkdirAll(TMP_MOUNT_DIR, 0600)
+	if err != nil {
+		t.Fatal("Can't create tmp mount dir")
+	}
+	defer os.Remove(TMP_MOUNT_DIR)
+
+	sudo("mount", "/dev/disk/by-uuid/78c1656c-a17f-11e5-b076-74e6e20dc9f0", TMP_MOUNT_DIR)
+	defer sudo("umount", TMP_MOUNT_DIR)
+
+	call("--do", TMP_MOUNT_DIR)
+
+	needPartitions := []testPartition{
+		{1, 32256, MSDOS_LAST_BYTE},
+	}
+	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
+	if partDiff != nil {
+		t.Error(partDiff)
+	}
+
+}
