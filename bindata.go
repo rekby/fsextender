@@ -4,7 +4,7 @@
 // usage.txt
 // DO NOT EDIT!
 
-package main
+package fsextender
 
 import (
 	"bytes"

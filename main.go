@@ -1,4 +1,4 @@
-package main
+package fsextender
 
 import (
 	"bytes"
@@ -14,10 +14,6 @@ import (
 const DEBUG = false
 
 //go:generate go-bindata README.md usage.txt
-func main() {
-	os.Exit(Main())
-}
-
 func Main() int {
 	showHelp := pflag.BoolP("help", "h", false, "Show long usage manual")
 	showReadme := pflag.Bool("readme", false, "Show readme")
