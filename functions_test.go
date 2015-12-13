@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -172,5 +173,52 @@ func TestReadLink(t *testing.T) {
 	res, err = readLink(fn("1"))
 	if res != fn("0") || err != nil {
 		t.Error(res, err)
+	}
+}
+
+func TestSortPartitionsByFirstByte(t *testing.T) {
+	var arr partitionSortByFirstByte
+
+	test := func() bool {
+		for i := 1; i < len(arr); i++ {
+			if arr[i-1].FirstByte > arr[i].FirstByte {
+				return false
+			}
+		}
+		return true
+	}
+
+	arr = nil
+	arr = append(arr, partition{FirstByte: 0}, partition{FirstByte: 1}, partition{FirstByte: 3})
+	sort.Sort(arr)
+	if !test() {
+		t.Error()
+	}
+
+	arr = nil
+	arr = append(arr, partition{FirstByte: 3}, partition{FirstByte: 2}, partition{FirstByte: 1})
+	sort.Sort(arr)
+	if !test() {
+		t.Error()
+	}
+
+	arr = nil
+	arr = append(arr, partition{FirstByte: 3}, partition{FirstByte: 1}, partition{FirstByte: 2})
+	sort.Sort(arr)
+	if !test() {
+		t.Error()
+	}
+
+	arr = nil
+	sort.Sort(arr)
+	if !test() {
+		t.Error()
+	}
+
+	arr = nil
+	arr = append(arr, partition{FirstByte: 2})
+	sort.Sort(arr)
+	if !test() {
+		t.Error()
 	}
 }
