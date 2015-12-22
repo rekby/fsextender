@@ -929,6 +929,7 @@ func TestLVMPartitionIn2MiddleDiskGPT(t *testing.T) {
 	if partDiff != nil {
 		t.Error(partDiff)
 		pretty.Println(readPartitions(disk))
+		pretty.Println(needPartitions)
 	}
 
 	testBytes, err := ioutil.ReadFile(filepath.Join(TMP_MOUNT_DIR, "test"))
