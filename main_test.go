@@ -19,10 +19,12 @@ const TMP_MOUNT_DIR = "/tmp/fsextender-test-mount-dir"
 const LVM_VG_NAME = "test-fsextender-lvm-vg"
 const LVM_LV_NAME = "test-fsextender-lvm-lv"
 
+const GPT_SIZE = 16896 // Size of GPT header + gpt entries
+const TMP_DISK_SIZE = 100*GB
 const MSDOS_START_BYTE = 32256
 const MSDOS_LAST_BYTE = 107374182399
-const GPT_START_BYTE = 0x4400
-const GPT_LAST_BYTE = 107374165503
+const GPT_START_BYTE = 512 + GPT_SIZE
+const GPT_LAST_BYTE = TMP_DISK_SIZE - GPT_SIZE - 1
 
 var PART_TABLES = []string{"msdos", "gpt"}
 
@@ -64,7 +66,7 @@ func createTmpDevice(partTable string) (path string, err error) {
 	fname := f.Name()
 
 	// Large sparse size = 100GB
-	_, err = f.WriteAt([]byte{0}, 100*GB)
+	_, err = f.WriteAt([]byte{0}, TMP_DISK_SIZE)
 	f.Close()
 	if err != nil {
 		os.Remove(fname)
