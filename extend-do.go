@@ -260,7 +260,7 @@ func extendDo(plan []storageItem) (needReboot bool) {
 					gptTable = gptTable.CreateTableForNewDiskSize(diskSizeInSectors)
 
 					if gptTable.Partitions[item.Partition.Number-1].LastLBA > gptTable.Header.LastUsableLBA {
-						log.Println("ATTENTION!!! Error in calc of GPT partition size", item.Path)
+						log.Println("ATTENTION!!! Error in calc of GPT partition size2", item.Path)
 						diskIO.Close()
 						continue
 					}
