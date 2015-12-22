@@ -1,6 +1,7 @@
 package fsextender
 
 import (
+	"errors"
 	"fmt"
 	"github.com/rekby/pflag"
 	"github.com/rekby/pretty"
@@ -20,7 +21,7 @@ const LVM_VG_NAME = "test-fsextender-lvm-vg"
 const LVM_LV_NAME = "test-fsextender-lvm-lv"
 
 const GPT_SIZE = 16896 // Size of GPT header + gpt entries
-const TMP_DISK_SIZE = 100*GB
+const TMP_DISK_SIZE = 100 * GB
 const MSDOS_START_BYTE = 32256
 const MSDOS_LAST_BYTE = 107374182399
 const GPT_START_BYTE = 512 + GPT_SIZE
@@ -115,6 +116,35 @@ func deleteTmpDevice(path string) {
 		}
 		time.Sleep(time.Second / 10) // time to kernel remove device
 	}
+}
+
+func extendTmpDevice(path string, size int64) (disk string, err error) {
+	filePath, _, _ := sudo("losetup", path)
+	start := strings.Index(filePath, "(")
+	finish := strings.Index(filePath, ")")
+	filePath = filePath[start+1 : finish]
+
+	sudo("sudo", "losetup", "-d", path)
+	fDisk, err := os.OpenFile(filePath, os.O_WRONLY, 0)
+	if err != nil {
+		os.Remove(filePath)
+		return "", errors.New("Error open file of disk: " + err.Error())
+	}
+	err = fDisk.Truncate(size)
+	if err != nil {
+		os.Remove(filePath)
+		return "", errors.New("Error truncate file of disk: " + err.Error())
+	}
+	fDisk.Close()
+
+	res, errString, err := sudo("losetup", "-f", "--show", filePath)
+	disk = strings.TrimSpace(res)
+	if path == "" {
+		err = fmt.Errorf("Can't create loop device: %v\n%v\n%v\n", filePath, err, errString)
+		os.Remove(filePath)
+		return "", err
+	}
+	return disk, nil
 }
 
 // Return volume of filesystem in 1-Gb blocks
@@ -1366,6 +1396,40 @@ func TestIssue14_ExtractPartNumberFromLinks(t *testing.T) {
 
 	needPartitions := []testPartition{
 		{1, 32256, MSDOS_LAST_BYTE},
+	}
+	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
+	if partDiff != nil {
+		t.Error(partDiff)
+	}
+}
+
+func Test_Issue17_ExtendBlockDeviceAfterGTPCreated(t *testing.T) {
+	disk, err := createTmpDevice("gpt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if disk != "" {
+			deleteTmpDevice(disk)
+		}
+	}() // For get disk value when defer will be called
+
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(GPT_START_BYTE), s(GB-1))
+	defer func() {
+		if disk != "" {
+			sudo("parted", "-s", disk, "rm", "1")
+		}
+	}()
+
+	disk, err = extendTmpDevice(disk, 200*GB)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	call(disk+"p1", "--do")
+
+	needPartitions := []testPartition{
+		{1, GPT_START_BYTE, 200*GB - GPT_SIZE - 1},
 	}
 	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
 	if partDiff != nil {

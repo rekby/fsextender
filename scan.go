@@ -834,7 +834,10 @@ func readDiskInfo(path string) (disk diskInfo, err error) {
 			return
 		}
 		firstUsableDiskByte = gptTable.Header.FirstUsableLBA * disk.SectorSizeLogical
-		lastUsableDiskByte = gptTable.Header.LastUsableLBA*disk.SectorSizeLogical + disk.SectorSizeLogical - 1
+		lastUsableDiskByte = disk.Size - disk.SectorSizeLogical /*GPT Header sector*/ - uint64(gptTable.Header.PartitionEntrySize)*uint64(gptTable.Header.PartitionsArrLen) - 1
+		if (lastUsableDiskByte+1)%disk.SectorSizeLogical != 0 {
+			lastUsableDiskByte = lastUsableDiskByte/disk.SectorSizeLogical*disk.SectorSizeLogical - 1
+		}
 		for i, gptPart := range gptTable.Partitions {
 			if gptPart.IsEmpty() {
 				continue
