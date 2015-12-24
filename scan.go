@@ -82,6 +82,8 @@ func (this storageItem) String() string {
 		base += ", PartNum=" + strconv.FormatUint(uint64(this.Partition.Number), 10)
 	case type_LVM_GROUP, type_LVM_PV, type_LVM_PV_ADD, type_LVM_PV_NEW:
 		base += ", ExtentSize: " + formatSize(this.LVMExtentSize)
+	case type_SKIP:
+		base += ", Reason: " + this.SkipReason
 	}
 	return base + "]"
 }
