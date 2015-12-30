@@ -823,16 +823,16 @@ func readDiskInfo(path string) (disk diskInfo, err error) {
 
 	// Try read mbr
 	mbrTable, err := mbr.Read(diskFile)
-	if err != nil {
+	if err != nil && !(err == mbr.ErrorPartitionLastSectorHigh && mbrTable.IsGPT()) {
 		log.Println("Can't read mbr table")
-		return
 	}
-	if mbrTable.IsGPT() {
+	switch {
+	case err != nil || mbrTable.IsGPT(): // If table is GPT or if can't read msdos table
 		disk.PartTable = "gpt"
 		var gptTable gpt.Table
 		gptTable, err = gpt.ReadTable(diskFile, disk.SectorSizeLogical)
 		if err != nil {
-			log.Println("Can't read gpt table: ", disk.Path, err)
+			log.Println("Can't read gpt table: ", disk.Path)
 			return
 		}
 		firstUsableDiskByte = gptTable.Header.FirstUsableLBA * disk.SectorSizeLogical
@@ -853,7 +853,7 @@ func readDiskInfo(path string) (disk diskInfo, err error) {
 			part.Path = part.makePath()
 			disk.Partitions = append(disk.Partitions, part)
 		}
-	} else {
+	case err == nil && !mbrTable.IsGPT(): // If it is msdos table
 		disk.PartTable = "msdos"
 		firstUsableDiskByte = 512 * 63 // As parted - align for can convert to GPT in feauture.
 		lastUsableDiskByte = disk.Size - 1
@@ -870,6 +870,11 @@ func readDiskInfo(path string) (disk diskInfo, err error) {
 			part.Path = part.makePath()
 			disk.Partitions = append(disk.Partitions, part)
 		}
+	}
+
+	if disk.PartTable == "" {
+		err = errors.New("Unknown partition table or read error")
+		return
 	}
 
 	// number of partition doesn't depend from order on disk. Sort it by disk order.

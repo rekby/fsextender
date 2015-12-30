@@ -15,6 +15,7 @@ import (
 )
 
 const GB = 1024 * 1024 * 1024
+const TB = 1024 * 1024 * 1024 * 1024
 const TMP_DIR = "/tmp"
 const TMP_MOUNT_DIR = "/tmp/fsextender-test-mount-dir"
 const LVM_VG_NAME = "test-fsextender-lvm-vg"
@@ -57,8 +58,13 @@ func call(args ...string) {
 	}
 }
 
-// Create loop-back test device with partition table
+// Create loop-back test device with partition table, standard size
 func createTmpDevice(partTable string) (path string, err error) {
+	return createTmpDeviceSize(partTable, TMP_DISK_SIZE)
+}
+
+// Create loop-back test device with partition table
+func createTmpDeviceSize(partTable string, size int64) (path string, err error) {
 	var f *os.File
 	f, err = ioutil.TempFile(TMP_DIR, "fsextender-loop-")
 	if err != nil {
@@ -67,7 +73,7 @@ func createTmpDevice(partTable string) (path string, err error) {
 	fname := f.Name()
 
 	// Large sparse size = 100GB
-	_, err = f.WriteAt([]byte{0}, TMP_DISK_SIZE)
+	_, err = f.WriteAt([]byte{0}, size)
 	f.Close()
 	if err != nil {
 		os.Remove(fname)
@@ -1430,6 +1436,25 @@ func Test_Issue17_ExtendBlockDeviceAfterGTPCreated(t *testing.T) {
 
 	needPartitions := []testPartition{
 		{1, GPT_START_BYTE, 200*GB - GPT_SIZE - 1},
+	}
+	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
+	if partDiff != nil {
+		t.Error(partDiff)
+	}
+}
+
+func TestIssue_18_MBR_ReadErrorBigDisk(t *testing.T) {
+	disk, err := createTmpDeviceSize("gpt", 8*TB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer deleteTmpDevice(disk)
+
+	sudo("parted", "-s", disk, "unit", "b", "mkpart", "primary", s(GPT_START_BYTE), s(GB-1))
+	call(disk+"p1", "--do")
+
+	needPartitions := []testPartition{
+		{1, GPT_START_BYTE, 8*TB - GPT_SIZE - 1},
 	}
 	partDiff := pretty.Diff(readPartitions(disk), needPartitions)
 	if partDiff != nil {
