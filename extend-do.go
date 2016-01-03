@@ -130,13 +130,15 @@ func extendDo(plan []storageItem) (needReboot bool) {
 					}
 				}
 
-				err = gptTable.Write(diskIO)
+				// First write table at end of disk, becouse it can be empty after extend of phisical disk.
+				// Сначала записываем таблицу разделов в конец диска, т.к. она может отсутствовать на обычном месте после расширения диска
+				err = gptTable.CreateOtherSideTable().Write(diskIO)
 				if err != nil {
 					log.Println("WARNING!!! Write GPT PRIMARY TABLE error. DATA MAY BE LOST.", item.Path, err)
 					diskIO.Close()
 					continue
 				}
-				err = gptTable.CreateOtherSideTable().Write(diskIO)
+				err = gptTable.Write(diskIO)
 				if err != nil {
 					log.Println("WARNING!!! Write GPT SECONDARY TABLE error. DATA MAY BE LOST.", item.Path, err)
 					diskIO.Close()
