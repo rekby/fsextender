@@ -1,0 +1,28 @@
+{
+	"ImportPath": "github.com/rekby/fsextender",
+	"GoVersion": "go1.5",
+	"Deps": [
+		{
+			"ImportPath": "github.com/kr/text",
+			"Rev": "bb797dc4fb8320488f47bf11de07a733d7233e1f"
+		},
+		{
+			"ImportPath": "github.com/ogier/pflag",
+			"Comment": "v0.0.1-4-g6f7159c",
+			"Rev": "6f7159c3154e7cd4ab30f6cc9c58fa3fd0f22325"
+		},
+		{
+			"ImportPath": "github.com/rekby/gpt",
+			"Rev": "f2cbeebca98b6b541e4c441208a81b4c12b17925"
+		},
+		{
+			"ImportPath": "github.com/rekby/mbr",
+			"Rev": "8c28b6465703c4dde586a09aeca764485f76b511"
+		},
+		{
+			"ImportPath": "github.com/rekby/pretty",
+			"Comment": "go.weekly.2011-12-22-28-gc162edf",
+			"Rev": "c162edfa0cca0d2e15fd7c015e8bfa9fc2398cdd"
+		}
+	]
+}

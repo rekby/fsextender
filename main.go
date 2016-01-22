@@ -3,7 +3,7 @@ package fsextender
 import (
 	"bytes"
 	"fmt"
-	"github.com/rekby/pflag"
+	"github.com/rekby/fsextender/Godeps/_workspace/src/github.com/ogier/pflag"
 	"log"
 	"os"
 	"os/exec"

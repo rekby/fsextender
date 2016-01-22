@@ -3,8 +3,8 @@ package fsextender
 import (
 	"errors"
 	"fmt"
-	"github.com/rekby/pflag"
-	"github.com/rekby/pretty"
+	"github.com/rekby/fsextender/Godeps/_workspace/src/github.com/ogier/pflag"
+	"github.com/rekby/fsextender/Godeps/_workspace/src/github.com/rekby/pretty"
 	"io/ioutil"
 	"os"
 	"path/filepath"
