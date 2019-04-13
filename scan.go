@@ -512,7 +512,7 @@ func fsGetSizeXFS(path string) (size uint64, err error) {
 		size = blockSize * blockCount
 		return size, nil
 	}
-	return 0, fmt.Errorf("I can't find size of xfs filesystem: ", path)
+	return 0, fmt.Errorf("I can't find size of xfs filesystem: %v", path)
 }
 
 // Return size of block device as it showed by kernel (in bytes)
@@ -593,7 +593,7 @@ func getMajorMinor(path string) (major, minor int) {
 func getMountPoint(devPath string) (res string, err error) {
 	originalMajor, originalMinor := getMajorMinor(devPath)
 	if originalMajor == 0 {
-		return "", fmt.Errorf("Can't get original major/minor numbers: ", devPath)
+		return "", fmt.Errorf("Can't get original major/minor numbers: %v", devPath)
 	}
 
 	mountsBytes, err := ioutil.ReadFile("/proc/mounts")
@@ -614,7 +614,7 @@ func getMountPoint(devPath string) (res string, err error) {
 			return fields[0], nil
 		}
 	}
-	return "", fmt.Errorf("Can't find mountpoint of: ", devPath)
+	return "", fmt.Errorf("Can't find mountpoint of: %v", devPath)
 }
 
 // Find and return partitions for create.
