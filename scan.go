@@ -611,7 +611,7 @@ func getMountPoint(devPath string) (res string, err error) {
 		fields := strings.Fields(line)
 		major, minor := getMajorMinor(fields[0])
 		if major == originalMajor && minor == originalMinor {
-			return fields[0], nil
+			return fields[1], nil
 		}
 	}
 	return "", fmt.Errorf("Can't find mountpoint of: %v", devPath)
