@@ -208,6 +208,13 @@ func (this *MBRPartition) SetLBALen(sectorCount uint32) {
 	writeLittleEndianUINT32(this.bytes[partitionLBALengthOffset:partitionLBALengthOffset+4], sectorCount)
 }
 
+/*
+Return true if this partition's bootable flag is set.
+*/
+func (this *MBRPartition) IsBootable() bool {
+	return this.bytes[partitionBootableOffset] == partitionBootableValue
+}
+
 func writeLittleEndianUINT32(buf []byte, val uint32) {
 	buf[0] = byte(val & 0xFF)
 	buf[1] = byte(val >> 8 & 0xFF)

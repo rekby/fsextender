@@ -2,6 +2,7 @@ package gpt
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/binary"
 	"fmt"
 	"hash/crc32"
@@ -202,7 +203,12 @@ func (this Partition) IsEmpty() bool {
 func (this Partition) Name() string {
 	chars := make([]uint16, 0, 36)
 	for i := 0; i < len(this.PartNameUTF16); i += 2 {
-		chars = append(chars, uint16(this.PartNameUTF16[i])+uint16(this.PartNameUTF16[i+1])<<8)
+		byte1 := this.PartNameUTF16[i]
+		byte2 := this.PartNameUTF16[i+1]
+		if byte1 == 0 && byte2 == 0 {
+			break
+		}
+		chars = append(chars, uint16(byte1)+uint16(byte2)<<8)
 	}
 	runes := utf16.Decode(chars)
 	return string(runes)
@@ -329,6 +335,134 @@ func (this Table) Write(writer io.WriteSeeker) (err error) {
 	return
 }
 
+// Use for create guid predefined values in snippet http://play.golang.org/p/uOd_WQtiwE
+func StringToGuid(guid string) (res [16]byte, err error) {
+	byteOrder := [...]int{3, 2, 1, 0, -1, 5, 4, -1, 7, 6, -1, 8, 9, -1, 10, 11, 12, 13, 14, 15}
+	if len(guid) != 36 {
+		err = fmt.Errorf("BAD guid string length.")
+		return
+	}
+	guidByteNum := 0
+	for i := 0; i < len(guid); i += 2 {
+		if byteOrder[guidByteNum] == -1 {
+			if guid[i] == '-' {
+				i++
+				guidByteNum++
+				if i >= len(guid)+1 {
+					err = fmt.Errorf("BAD guid format minus")
+					return
+				}
+			} else {
+				err = fmt.Errorf("BAD guid char in minus pos")
+				return
+			}
+		}
+
+		sub := guid[i : i+2]
+		var bt byte
+		for pos, ch := range sub {
+			var shift uint
+			if pos == 0 {
+				shift = 4
+			} else {
+				shift = 0
+			}
+			switch ch {
+			case '0':
+				bt |= 0 << shift
+			case '1':
+				bt |= 1 << shift
+			case '2':
+				bt |= 2 << shift
+			case '3':
+				bt |= 3 << shift
+			case '4':
+				bt |= 4 << shift
+			case '5':
+				bt |= 5 << shift
+			case '6':
+				bt |= 6 << shift
+			case '7':
+				bt |= 7 << shift
+			case '8':
+				bt |= 8 << shift
+			case '9':
+				bt |= 9 << shift
+			case 'A', 'a':
+				bt |= 10 << shift
+			case 'B', 'b':
+				bt |= 11 << shift
+			case 'C', 'c':
+				bt |= 12 << shift
+			case 'D', 'd':
+				bt |= 13 << shift
+			case 'E', 'e':
+				bt |= 14 << shift
+			case 'F', 'f':
+				bt |= 15 << shift
+			default:
+				err = fmt.Errorf("BAD guid char at pos %d: '%c'", i+pos, ch)
+				return
+			}
+		}
+		res[byteOrder[guidByteNum]] = bt
+		guidByteNum++
+	}
+	return res, nil
+}
+
+// NewTableArgs - arguments NewTable creation.
+type NewTableArgs struct {
+	SectorSize uint64
+	DiskGuid   Guid
+}
+
+// NewTable - return a valid empty Table for given sectorSize and diskSize
+//    Note that a Protective MBR is needed for lots of software to read the GPT table.
+func NewTable(diskSize uint64, args *NewTableArgs) Table {
+	// CreateTableForNewdiskSize will update HeaderCopyStartLBA, LastUsableLBA, and CRC
+	if args == nil {
+		args = &NewTableArgs{}
+	}
+	if args.SectorSize == 0 {
+		args.SectorSize = uint64(512)
+	}
+	var emptyGuid Guid
+	if args.DiskGuid == emptyGuid {
+		args.DiskGuid = NewGUID()
+	}
+
+	ptStartLBA := uint64(2)
+	numParts := 128
+	partitionsTableSize := uint64(standardPartitionEntrySize) * uint64(numParts)
+	partitionSizeInSector := partitionsTableSize / uint64(args.SectorSize)
+	if partitionsTableSize%uint64(args.SectorSize) != 0 {
+		partitionSizeInSector++
+	}
+
+	return Table{
+		SectorSize: args.SectorSize,
+		Header: Header{
+			Signature:               [8]byte{0x45, 0x46, 0x49, 0x20, 0x50, 0x41, 0x52, 0x54},
+			Revision:                0x10000,
+			Size:                    standardHeaderSize,
+			CRC:                     0,
+			Reserved:                0,
+			HeaderStartLBA:          1,
+			HeaderCopyStartLBA:      0,
+			FirstUsableLBA:          ptStartLBA + partitionSizeInSector,
+			LastUsableLBA:           0,
+			DiskGUID:                args.DiskGuid,
+			PartitionsTableStartLBA: ptStartLBA,
+			PartitionsArrLen:        uint32(numParts),
+			PartitionEntrySize:      uint32(standardPartitionEntrySize),
+			PartitionsCRC:           0x0,
+			TrailingBytes:           make([]byte, args.SectorSize-uint64(standardHeaderSize)),
+		},
+		Partitions: make([]Partition, numParts),
+	}.CreateTableForNewDiskSize(diskSize / args.SectorSize)
+}
+
 //////////////////////////////////////////////
 //////////////// INTERNALS ///////////////////
 //////////////////////////////////////////////
@@ -402,78 +536,15 @@ func guidToString(byteGuid [16]byte) string {
 	return string(s)
 }
 
-// Use for create guid predefined values in snippet http://play.golang.org/p/uOd_WQtiwE
-func stringToGuid(guid string) (res [16]byte, err error) {
-	byteOrder := [...]int{3, 2, 1, 0, -1, 5, 4, -1, 7, 6, -1, 8, 9, -1, 10, 11, 12, 13, 14, 15}
-	if len(guid) != 36 {
-		err = fmt.Errorf("BAD guid string length.")
-		return
+func NewGUID() Guid {
+	var res Guid
+	_, err := rand.Read(res[:])
+	if err != nil {
+		panic(err)
 	}
-	guidByteNum := 0
-	for i := 0; i < len(guid); i += 2 {
-		if byteOrder[guidByteNum] == -1 {
-			if guid[i] == '-' {
-				i++
-				guidByteNum++
-				if i >= len(guid)+1 {
-					err = fmt.Errorf("BAD guid format minus")
-					return
-				}
-			} else {
-				err = fmt.Errorf("BAD guid char in minus pos")
-				return
-			}
-		}
 
-		sub := guid[i : i+2]
-		var bt byte
-		for pos, ch := range sub {
-			var shift uint
-			if pos == 0 {
-				shift = 4
-			} else {
-				shift = 0
-			}
-			switch ch {
-			case '0':
-				bt |= 0 << shift
-			case '1':
-				bt |= 1 << shift
-			case '2':
-				bt |= 2 << shift
-			case '3':
-				bt |= 3 << shift
-			case '4':
-				bt |= 4 << shift
-			case '5':
-				bt |= 5 << shift
-			case '6':
-				bt |= 6 << shift
-			case '7':
-				bt |= 7 << shift
-			case '8':
-				bt |= 8 << shift
-			case '9':
-				bt |= 9 << shift
-			case 'A', 'a':
-				bt |= 10 << shift
-			case 'B', 'b':
-				bt |= 11 << shift
-			case 'C', 'c':
-				bt |= 12 << shift
-			case 'D', 'd':
-				bt |= 13 << shift
-			case 'E', 'e':
-				bt |= 14 << shift
-			case 'F', 'f':
-				bt |= 15 << shift
-			default:
-				err = fmt.Errorf("BAD guid char: ", i+pos, ch)
-				return
-			}
-		}
-		res[byteOrder[guidByteNum]] = bt
-		guidByteNum++
-	}
-	return res, nil
+	// set predefined bits for UUIDv4
+	res[6] = (res[6] & 0x0f) | 0x40 // Version 4
+	res[8] = (res[8] & 0x3f) | 0x80 // Variant 10
+	return res
 }

@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"text/tabwriter"
 
-	"github.com/rekby/fsextender/Godeps/_workspace/src/github.com/kr/text"
+	"github.com/kr/text"
 )
 
 const (
@@ -149,7 +149,7 @@ func (p *printer) printValue(v reflect.Value, showType, quote bool) {
 					pp.printValue(mv, showTypeInStruct, true)
 					if expand {
 						io.WriteString(pp, ",\n")
-					} else if i < v.Len()-1 {
+					} else if i < v.Len() - 1 {
 						io.WriteString(pp, ", ")
 					}
 				}
@@ -164,7 +164,7 @@ func (p *printer) printValue(v reflect.Value, showType, quote bool) {
 				addr := v.UnsafeAddr()
 				vis := visit{addr, t}
 				if vd, ok := p.visited[vis]; ok && vd < p.depth {
-					p.fmtString(t.String()+"{(CYCLIC REFERENCE)}", false)
+					p.fmtString(t.String() + "{(CYCLIC REFERENCE)}", false)
 					break // don't print v again
 				}
 				p.visited[vis] = p.depth
@@ -194,7 +194,7 @@ func (p *printer) printValue(v reflect.Value, showType, quote bool) {
 					pp.printValue(getField(v, i), showTypeInStruct, true)
 					if expand {
 						io.WriteString(pp, ",\n")
-					} else if i < v.NumField()-1 {
+					} else if i < v.NumField() - 1 {
 						io.WriteString(pp, ", ")
 					}
 				}
@@ -240,7 +240,7 @@ func (p *printer) printValue(v reflect.Value, showType, quote bool) {
 				pp.printValue(v.Index(i), showTypeInSlice, true)
 				if expand {
 					io.WriteString(pp, ",\n")
-				} else if i < v.Len()-1 {
+				} else if i < v.Len() - 1 {
 					io.WriteString(pp, ", ")
 				}
 			}

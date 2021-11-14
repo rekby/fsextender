@@ -2,8 +2,8 @@ package fsextender
 
 import (
 	"fmt"
-	"github.com/rekby/fsextender/Godeps/_workspace/src/github.com/rekby/gpt"
-	"github.com/rekby/fsextender/Godeps/_workspace/src/github.com/rekby/mbr"
+	"github.com/rekby/gpt"
+	"github.com/rekby/mbr"
 	"io/ioutil"
 	"log"
 	"os"
