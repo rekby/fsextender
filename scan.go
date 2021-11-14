@@ -55,6 +55,42 @@ const (
 	type_LAST // Doesn't use in work - for tests only.
 )
 
+var (
+	dynamicMajorIdVirtblk = -1
+)
+
+func init() {
+	devicesBytes, err := ioutil.ReadFile("/proc/devices")
+	if err == nil {
+		dynamicMajorIdVirtblk = parseVirtBlkMajorID(devicesBytes)
+	} else {
+		log.Printf("Can't read /proc/devices: %v\n", err)
+	}
+}
+
+func parseVirtBlkMajorID(devicesB []byte) int {
+	devices := string(devicesB)
+	lines := strings.Split(devices, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		parts := strings.Split(line, " ")
+		if len(parts) != 2 {
+			continue
+		}
+		name := parts[1]
+		if name != "virtblk" {
+			continue
+		}
+		id, err := strconv.Atoi(parts[0])
+		if err != nil {
+			log.Printf("Can't parse virtblk major id from string: %q\n", line)
+			return -1
+		}
+		return id
+	}
+	return -1
+}
+
 type storageItem struct {
 	Type      storageItemType // Storage type. Тип устройства
 	Path      string          // Path to device or name of device (for LVM group). Путь к устройству или имя (например для LVM)
@@ -695,6 +731,11 @@ func getTypeByMajorMinor(major, minor int) storageItemType {
 	}
 
 	switch major {
+	case dynamicMajorIdVirtblk:
+		if minor == 0 {
+			return type_DISK
+		}
+		return type_PARTITION
 	case 7:
 		return type_DISK
 	case 3, 22, 33, 34, 56, 57, 88, 89, 90, 91:
