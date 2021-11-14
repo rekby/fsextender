@@ -1,5 +1,8 @@
-[![Build Status](https://travis-ci.org/rekby/fsextender.svg)](https://travis-ci.org/rekby/fsextender)
-[![Coverage Status](https://coveralls.io/repos/rekby/fsextender/badge.svg?branch=master&service=github)](https://coveralls.io/github/rekby/fsextender?branch=master)
+[comment]: <> ([![Coverage Status]&#40;https://coveralls.io/repos/rekby/fsextender/badge.svg?branch=master&service=github&#41;]&#40;https://coveralls.io/github/rekby/fsextender?branch=master&#41;)
+
+[comment]: <> ([![Build Status]&#40;https://travis-ci.org/rekby/fsextender.svg&#41;]&#40;https://travis-ci.org/rekby/fsextender&#41;)
+
+[comment]: <> (Test status doesn't actual because based on old unsupported ubuntu version. )
 
 Extend filesystem to max size with underliing layers.
 It can extend: ext3, ext4, xfs, LVM Logical volume, LVM Physical volume, LVM Volume Group (with new or free pv)
